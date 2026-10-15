@@ -73,7 +73,52 @@ const UnitInfo *unit_for(std::uint32_t pc) {
     return g_index[slot];
 }
 
+const OverlayInfo *g_overlays = nullptr;
+std::uint32_t g_overlay_count = 0;
+std::vector<const OverlayInfo *> g_overlays_seen;
+
+bool overlay_loaded(const OverlayInfo &o) {
+    for (std::uint32_t k = 0; k < o.check_count; ++k)
+        if (ld32(o.checks[2 * k]) != o.checks[2 * k + 1]) return false;
+    return true;
+}
+
+// The overlay whose code is in memory at pc right now, trying the ones seen recently first.
+const OverlayInfo *overlay_for(std::uint32_t pc) {
+    for (std::size_t k = 0; k < g_overlays_seen.size(); ++k) {
+        const OverlayInfo *o = g_overlays_seen[k];
+        if (pc - o->base >= o->size) continue;
+        if (overlay_loaded(*o)) return o;
+        g_overlays_seen.erase(g_overlays_seen.begin() + static_cast<std::ptrdiff_t>(k));
+        break;
+    }
+    for (std::uint32_t k = 0; k < g_overlay_count; ++k) {
+        const OverlayInfo &o = g_overlays[k];
+        if (pc - o.base < o.size && overlay_loaded(o)) {
+            g_overlays_seen.push_back(&o);
+            return &o;
+        }
+    }
+    return nullptr;
+}
+
+std::uint16_t overlay_entry(const OverlayInfo &o, std::uint32_t pc, const UnitInfo *&unit) {
+    for (std::uint32_t k = 0; k < o.count; ++k)
+        if (pc - o.units[k].base < o.units[k].size) {
+            unit = &o.units[k];
+            return unit->entries[(pc - unit->base) >> 2];
+        }
+    return 0;
+}
+
 void record_miss(std::uint32_t pc) {
+    if (const OverlayInfo *o = overlay_for(pc)) {
+        char token[96];
+        std::snprintf(token, sizeof token, "%s:%x", o->name, pc);
+        if (!g_module_misses.insert(token).second || g_options.misses_path.empty()) return;
+        std::ofstream(g_options.misses_path, std::ios::app) << token << "\n";
+        return;
+    }
     if (const Instance *m = instance_for(pc)) {
         char token[96];
         std::snprintf(token, sizeof token, "%s:%x", m->module->name, pc - m->base);
@@ -105,9 +150,19 @@ void register_modules(const ModuleInfo *modules, std::uint32_t count) {
     for (std::uint32_t k = 0; k < count; ++k) g_module_span = std::max(g_module_span, modules[k].size);
 }
 
+void register_overlays(const OverlayInfo *overlays, std::uint32_t count) {
+    g_overlays = overlays;
+    g_overlay_count = count;
+    g_overlays_seen.clear();
+}
+
 bool has_code(std::uint32_t pc) {
     const UnitInfo *u = unit_for(pc);
     if (u && u->entries[(pc - u->base) >> 2] != 0) return true;
+    if (const OverlayInfo *o = overlay_for(pc)) {
+        const UnitInfo *ou = nullptr;
+        if (overlay_entry(*o, pc, ou)) return true;
+    }
     const Instance *m = instance_for(pc);
     const UnitInfo *mu = m ? module_unit(*m->module, pc - m->base) : nullptr;
     return mu && mu->entries[(pc - m->base - mu->base) >> 2] != 0;
@@ -120,6 +175,13 @@ void dispatch(Cpu &c, std::uint32_t, std::uint32_t depth) {
     const UnitInfo *u = unit_for(pc);
     const std::uint16_t id = u ? u->entries[(pc - u->base) >> 2] : 0;
     if (!id) {
+        if (const OverlayInfo *o = overlay_for(pc)) {
+            const UnitInfo *ou = nullptr;
+            if (const std::uint16_t entry = overlay_entry(*o, pc, ou)) {
+                ou->function(c, entry, depth);
+                return;
+            }
+        }
         if (const Instance *m = instance_for(pc)) {
             const std::uint32_t base = m->base;
             const UnitInfo *mu = module_unit(*m->module, pc - base);

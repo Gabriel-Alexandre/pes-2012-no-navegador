@@ -40,7 +40,11 @@ Image Image::load(const std::string &path) {
         const auto filesz = read<std::uint32_t>(data, ph + 16), memsz = read<std::uint32_t>(data, ph + 20);
         const auto flags = read<std::uint32_t>(data, ph + 24);
         if (offset + filesz > data.size()) throw std::runtime_error("segment outside the file");
-        Segment segment{vaddr, std::vector<std::uint8_t>(memsz), (flags & 1u) != 0};
+        // Only file bytes can hold code. The zero fill past them is bss, or a slot that an overlay
+        // fills at run time (PES 2012 reserves dozens); translating it would turn zeros into a nop
+        // sled that runs off the end of the program instead of reaching the overlay.
+        if (filesz == 0) continue;
+        Segment segment{vaddr, std::vector<std::uint8_t>((flags & 1u) ? filesz : memsz), (flags & 1u) != 0};
         std::memcpy(segment.bytes.data(), data.data() + offset, filesz);
         image.segments_.push_back(std::move(segment));
     }

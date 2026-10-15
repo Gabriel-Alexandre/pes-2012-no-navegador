@@ -4,6 +4,7 @@
 #include "snr2.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -90,8 +91,64 @@ std::vector<Snr2Module> read_modules(const std::string &dir) {
     return modules;
 }
 
+// PES 2012's overlays: OVER.AFS entries that start with "MWo3" and are loaded whole, header
+// included, at a fixed address. Header: magic, id, load address, end of code (relative to the
+// load address), data size, bss size, end of the file image, end again, then a name at 0x20;
+// code starts at 0x80. Entries whose code ends inside the header carry only data.
+struct Overlay {
+    std::string name;
+    std::uint32_t base{};
+    std::uint32_t text_end{};
+    std::vector<std::uint8_t> bytes;
+};
+
+constexpr std::uint32_t kMwo3Magic = 0x336F574Du;
+constexpr std::uint32_t kMwo3CodeStart = 0x80u;
+
+std::vector<Overlay> read_overlays(const std::string &dir) {
+    std::vector<std::filesystem::path> paths;
+    for (const auto &entry : std::filesystem::directory_iterator(dir))
+        if (entry.is_regular_file()) paths.push_back(entry.path());
+    std::sort(paths.begin(), paths.end());
+    std::vector<Overlay> overlays;
+    for (const auto &path : paths) {
+        std::ifstream file(path, std::ios::binary);
+        std::vector<std::uint8_t> bytes{std::istreambuf_iterator<char>(file), {}};
+        if (bytes.size() < kMwo3CodeStart) continue;
+        const auto u32 = [&](std::size_t at) { std::uint32_t v; std::memcpy(&v, bytes.data() + at, 4); return v; };
+        if (u32(0) != kMwo3Magic) continue;
+        const std::uint32_t code_end = std::min<std::uint32_t>(u32(12), static_cast<std::uint32_t>(bytes.size()));
+        if (code_end <= 0xC0u) continue;
+        std::string name(reinterpret_cast<const char *>(bytes.data() + 0x20), strnlen(reinterpret_cast<const char *>(bytes.data() + 0x20), 0x60));
+        if (const auto dot = name.find('.'); dot != std::string::npos) name.resize(dot);
+        for (char &ch : name)
+            if (!std::isalnum(static_cast<unsigned char>(ch))) ch = '_';
+        if (name.empty()) name = "ovl" + std::to_string(u32(4));
+        overlays.push_back({name, u32(8), u32(8) + code_end, std::move(bytes)});
+    }
+    return overlays;
+}
+
+std::vector<std::pair<std::uint32_t, std::uint32_t>> overlay_checks(const Overlay &o, const Program &program) {
+    std::vector<std::uint32_t> words;
+    for (std::uint32_t pc = o.base + kMwo3CodeStart; pc + 4 <= o.text_end; pc += 4) {
+        std::uint32_t value;
+        std::memcpy(&value, o.bytes.data() + (pc - o.base), 4);
+        if (program.is_code(pc) && value) words.push_back(pc);
+    }
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> checks;
+    for (std::size_t k = 0; k < 8 && !words.empty(); ++k) {
+        const std::uint32_t pc = words[k * words.size() / 8];
+        if (!checks.empty() && checks.back().first == pc) continue;
+        std::uint32_t value;
+        std::memcpy(&value, o.bytes.data() + (pc - o.base), 4);
+        checks.emplace_back(pc, value);
+    }
+    return checks;
+}
+
 int usage() {
-    std::fprintf(stderr, "usage: eerecomp <elf> [--entries file] [--modules dir] [--probes file] [--out dir] [--stats]\n");
+    std::fprintf(stderr, "usage: eerecomp <elf> [--entries file] [--modules dir] [--overlays dir] [--probes file] [--out dir] [--stats]\n");
     return 2;
 }
 
@@ -99,7 +156,7 @@ int usage() {
 
 int main(int argc, char **argv) {
     if (argc < 2) return usage();
-    std::string elf_path = argv[1], entries_path, out, probes_path, modules_dir;
+    std::string elf_path = argv[1], entries_path, out, probes_path, modules_dir, overlays_dir;
     bool stats = false;
     for (int i = 2; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -108,6 +165,7 @@ int main(int argc, char **argv) {
         else if (arg == "--out" && i + 1 < argc) out = argv[++i];
         else if (arg == "--probes" && i + 1 < argc) probes_path = argv[++i];
         else if (arg == "--modules" && i + 1 < argc) modules_dir = argv[++i];
+        else if (arg == "--overlays" && i + 1 < argc) overlays_dir = argv[++i];
         else return usage();
     }
 
@@ -141,6 +199,23 @@ int main(int argc, char **argv) {
         if (!modules.empty())
             std::printf("%zu modules, code %zu instructions (%zu KiB), %zu sites in the program linked at run time\n", modules.size(), module_code,
                         module_code * 4 / 1024, imports.size());
+
+        const std::vector<Overlay> overlays = overlays_dir.empty() ? std::vector<Overlay>{} : read_overlays(overlays_dir);
+        std::size_t overlay_code = 0;
+        for (const Overlay &o : overlays) {
+            images.push_back(Image::raw(o.base, o.bytes, {o.base + kMwo3CodeStart, o.text_end}));
+            std::vector<std::uint32_t> seeds{o.base + kMwo3CodeStart};
+            if (const auto it = entries.modules.find(o.name); it != entries.modules.end()) seeds.insert(seeds.end(), it->second.begin(), it->second.end());
+            programs.push_back(analyse(images.back(), seeds, {}));
+            overlay_code += code_size(programs.back());
+            Translation t{&images.back(), &programs.back(), nullptr, "o_" + o.name + "_", false, o.name,
+                          static_cast<std::uint32_t>(o.bytes.size()), overlay_checks(o, programs.back())};
+            t.overlay = true;
+            t.base = o.base;
+            translations.push_back(std::move(t));
+        }
+        if (!overlays.empty())
+            std::printf("%zu overlays, code %zu instructions (%zu KiB)\n", overlays.size(), overlay_code, overlay_code * 4 / 1024);
 
         if (!out.empty()) {
             CodegenOptions options;

@@ -30,8 +30,21 @@ struct ModuleInfo {
     std::uint32_t count;
 };
 
+// Code the game loads at a fixed address while it runs (PES 2012's MWo3 overlays): several
+// overlays share one slot, so the checks (address, word pairs) tell which one is in memory now.
+struct OverlayInfo {
+    const char *name;
+    std::uint32_t base;
+    std::uint32_t size;
+    const std::uint32_t *checks;
+    std::uint32_t check_count;
+    const UnitInfo *units;
+    std::uint32_t count;
+};
+
 void register_units(const UnitInfo *units, std::uint32_t count);
 void register_modules(const ModuleInfo *modules, std::uint32_t count);
+void register_overlays(const OverlayInfo *overlays, std::uint32_t count);
 
 void dispatch(Cpu &c, std::uint32_t entry, std::uint32_t depth);
 void call(Cpu &c, std::uint32_t target, std::uint32_t depth);

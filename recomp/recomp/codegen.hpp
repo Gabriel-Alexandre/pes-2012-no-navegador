@@ -27,6 +27,9 @@ struct Translation {
     std::string name;
     std::uint32_t size{};
     std::vector<std::pair<std::uint32_t, std::uint32_t>> checks;
+    // A fixed-address overlay: code at its own absolute address, told apart by absolute checks.
+    bool overlay{};
+    std::uint32_t base{};
 };
 
 void generate(const std::vector<Translation> &translations, const CodegenOptions &options);

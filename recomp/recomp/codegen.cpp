@@ -787,10 +787,10 @@ private:
 
 void generate(const std::vector<Translation> &translations, const CodegenOptions &options) {
     fs::create_directories(options.output);
-    std::ostringstream header, table, modules;
+    std::ostringstream header, table, modules, overlays;
     header << "#pragma once\n\n#include \"ps2/generated.hpp\"\n\nnamespace gen {\n";
     table << "#include \"units.hpp\"\n\nnamespace gen {\n\n";
-    std::size_t written = 0, main_units = 0, module_count = 0;
+    std::size_t written = 0, main_units = 0, module_count = 0, overlay_count = 0;
     for (const Translation &t : translations) {
         const std::vector<UnitRow> rows = Generator(t, options).run();
         written += rows.size();
@@ -798,23 +798,32 @@ void generate(const std::vector<Translation> &translations, const CodegenOptions
             header << "void " << r.function << "(ps2::Cpu &c, std::uint32_t entry, std::uint32_t depth);\n";
             header << "extern const std::uint16_t " << r.table << "[];\n";
         }
-        table << "const ps2::UnitInfo " << (t.relocatable ? t.prefix + "units" : "kUnits") << "[] = {\n";
+        const bool own_table = t.relocatable || t.overlay;
+        table << "const ps2::UnitInfo " << (own_table ? t.prefix + "units" : "kUnits") << "[] = {\n";
         for (const UnitRow &r : rows) table << std::format("    {{{}, {}u, &{}, {}}},\n", hex(r.base), r.size, r.function, r.table);
         table << "};\n\n";
-        if (!t.relocatable) {
+        if (!own_table) {
             main_units = rows.size();
             continue;
         }
         table << "const std::uint32_t " << t.prefix << "checks[] = {";
         for (const auto &[at, value] : t.checks) table << std::format("{}, {}, ", hex(at), hex(value));
         table << "};\n\n";
+        if (t.overlay) {
+            overlays << std::format("    {{\"{}\", {}, {}, {}checks, {}u, {}units, {}u}},\n", t.name, hex(t.base), hex(t.size), t.prefix,
+                                    t.checks.size(), t.prefix, rows.size());
+            ++overlay_count;
+            continue;
+        }
         modules << std::format("    {{\"{}\", {}, {}checks, {}u, {}units, {}u}},\n", t.name, hex(t.size), t.prefix, t.checks.size(), t.prefix, rows.size());
         ++module_count;
     }
     header << "}\n";
     if (module_count) table << "const ps2::ModuleInfo kModules[] = {\n" << modules.str() << "};\n\n";
+    if (overlay_count) table << "const ps2::OverlayInfo kOverlays[] = {\n" << overlays.str() << "};\n\n";
     table << "}\n\nvoid register_generated_code() { ps2::register_units(gen::kUnits, " << main_units << "u);";
     if (module_count) table << " ps2::register_modules(gen::kModules, " << module_count << "u);";
+    if (overlay_count) table << " ps2::register_overlays(gen::kOverlays, " << overlay_count << "u);";
     table << " }\n";
     write_if_changed(fs::path(options.output) / "units.hpp", header.str());
     write_if_changed(fs::path(options.output) / "table.cpp", table.str());

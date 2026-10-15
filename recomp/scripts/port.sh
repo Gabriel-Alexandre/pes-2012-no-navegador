@@ -97,6 +97,25 @@ if grep -q SNR2 "$elf"; then
   python3 -I "$here/disc.py" modules "$iso" "$game/modules"
   modules=(--modules "$game/modules")
 fi
+# PES 2012 keeps code it loads while running in OVER.AFS, as MWo3 overlays at fixed addresses
+if python3 -I "$here/disc.py" list "$iso" | awk '{print $4}' | grep -qx OVER.AFS; then
+  python3 -I "$here/disc.py" extract "$iso" "$game/disc" OVER.AFS > /dev/null
+  python3 -I - "$game/disc/OVER.AFS" "$game/overlays" <<'EOF'
+import os, struct, sys
+data = open(sys.argv[1], 'rb').read()
+os.makedirs(sys.argv[2], exist_ok=True)
+count = struct.unpack_from('<I', data, 4)[0] if data[:4] == b'AFS\0' else 0
+kept = 0
+for i in range(count):
+    off, size = struct.unpack_from('<II', data, 8 + i * 8)
+    blob = data[off:off + size]
+    if blob[:4] == b'MWo3':
+        open(os.path.join(sys.argv[2], '%02d.bin' % i), 'wb').write(blob)
+        kept += 1
+print('%d MWo3 overlays in OVER.AFS' % kept)
+EOF
+  modules+=(--overlays "$game/overlays")
+fi
 
 translate() { "$tools/eerecomp" "$elf" --entries "$game/entries.txt" "${modules[@]}" --out "$generated" | tail -1; }
 
@@ -120,6 +139,8 @@ if [ "$explore" = 1 ]; then
     PS2_GPU_LOW_POWER=1 PS2_VU_RECORD="$game/vu1" "$native/ps2run" "$elf" --disc "$iso" --misses "$game/misses.txt" --memcard "$game/explore.ps2" \
       --frames "$frames" "${presses[@]}" --frames-dir "$game/shots" --frame-every 300 > "$game/explore.log" 2>&1 || true
     reason=$(sed -n 's/^\[ee\] halted: //p' "$game/explore.log" | head -1)
+    # the runner can fail before the game starts (an executable it cannot load); say so instead of "ran to the end"
+    [ -n "$reason" ] || reason=$(grep -m1 -E '^cannot load' "$game/explore.log" || true)
     added=$(python3 -I - "$game/entries.txt" "$game/misses.txt" <<'EOF'
 import os, sys
 entries, misses = sys.argv[1], sys.argv[2]
