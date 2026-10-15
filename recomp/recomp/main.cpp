@@ -183,7 +183,7 @@ int main(int argc, char **argv) {
 
         // Overlays sit at fixed addresses, so the main program holds their function addresses
         // itself: as jal and j targets, as words in its data and as lui + addiu/ori pairs.
-        std::vector<std::uint32_t> main_pointers;
+        std::vector<std::uint32_t> main_pointers, main_calls;
         if (!overlays.empty())
             for (const auto &segment : image.segments()) {
                 const std::size_t n = segment.bytes.size() / 4;
@@ -194,7 +194,7 @@ int main(int argc, char **argv) {
                     if (!segment.executable) continue;
                     if ((w[k] >> 26) == 0x02u || (w[k] >> 26) == 0x03u) {  // j / jal straight into an overlay slot
                         const std::uint32_t pc = segment.address + static_cast<std::uint32_t>(4 * k);
-                        main_pointers.push_back(((pc + 4u) & 0xF0000000u) | ((w[k] & 0x03FFFFFFu) << 2));
+                        main_calls.push_back(((pc + 4u) & 0xF0000000u) | ((w[k] & 0x03FFFFFFu) << 2));
                         continue;
                     }
                     if ((w[k] >> 26) != 0x0Fu) continue;  // lui rt, hi
@@ -209,6 +209,15 @@ int main(int argc, char **argv) {
             }
         std::sort(main_pointers.begin(), main_pointers.end());
         main_pointers.erase(std::unique(main_pointers.begin(), main_pointers.end()), main_pointers.end());
+        // overlays call each other directly too (game.ovl into the slot at 0x0093C800)
+        for (const Overlay &o : overlays)
+            for (std::uint32_t pc = o.base + kMwo3CodeStart; pc + 4 <= o.text_end; pc += 4) {
+                std::uint32_t w;
+                std::memcpy(&w, o.bytes.data() + (pc - o.base), 4);
+                if ((w >> 26) == 0x02u || (w >> 26) == 0x03u) main_calls.push_back(((pc + 4u) & 0xF0000000u) | ((w & 0x03FFFFFFu) << 2));
+            }
+        std::sort(main_calls.begin(), main_calls.end());
+        main_calls.erase(std::unique(main_calls.begin(), main_calls.end()), main_calls.end());
         std::size_t overlay_code = 0, overlay_calls = 0, seeded_from_main = 0;
         for (const Overlay &o : overlays) {
             images.push_back(Image::raw(o.base, o.bytes, {o.base + kMwo3CodeStart, o.text_end}));
@@ -223,6 +232,15 @@ int main(int argc, char **argv) {
             // pointers the main program keeps into this slot, where they land on a plausible
             // function start here (after a jr ra and its delay slot, after two words of padding, or on a
             // prologue): several overlays share a slot, so the filter keeps the others' addresses out
+            for (auto it = std::lower_bound(main_calls.begin(), main_calls.end(), o.base + kMwo3CodeStart); it != main_calls.end() && *it < o.text_end; ++it) {
+                const std::uint32_t t = *it;
+                if (t % 4 || t < o.base + kMwo3CodeStart + 8) continue;
+                // a direct call is an entry in whichever overlay is loaded when it runs; game.ovl's
+                // code spans other overlays' slots, so seed every overlay that covers it: in the
+                // wrong one it only adds an entry inside valid code
+                seeds.push_back(t);
+                ++seeded_from_main;
+            }
             const auto first = std::lower_bound(main_pointers.begin(), main_pointers.end(), o.base + kMwo3CodeStart);
             for (auto it = first; it != main_pointers.end() && *it < o.text_end; ++it) {
                 const std::uint32_t t = *it;
