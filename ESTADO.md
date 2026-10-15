@@ -8,7 +8,7 @@
 | 1. A imagem | ✅ extraída, MD5 `c6a29549273f60475a6765791886eae6` confere, em `~/pes-work/games/pes2012/disc.iso` |
 | 2. Primeira tradução | ✅ feita; ele decidiu seguir (15/out) e o suporte aos overlays `MWo3` foi construído |
 | 3. Abrir o jogo | 🟡 **o jogo chega aos menus (15/out):** idioma, avisos do memory card, vídeo de abertura, **tela de título** ("PULSA UN BOTÓN") e a **escolha de dificuldade**. A tela preta depois do vídeo era o vblank desligado pelo reprodutor de vídeo (ver `docs/RECOMPILADOR.md`). Defeito gráfico: listras horizontais no fundo das caixas de menu |
-| 4. A partida | ⬜ |
+| 4. A partida | 🟡 **o jogo entra na partida (15/out):** menu "Partido" → "Amistoso" → seleção (`select1.ovl`) → o `game.ovl` carrega → estádio Artemio Franchi com o painel de clima, túnel e **times perfilados no gramado**, em 3D. Foram 3 rodadas de exploração (`select1:6caf00`, `game:d28d00`, `2efd90`) e a 4ª rodou 9.000 quadros sem faltar código. Defeito: **rostos dos jogadores sem textura** (máscara bege). ⬜ Falta ver o pontapé inicial e o jogo andando |
 | 5. Som e controle | ⬜ |
 | 6. Navegador | 🟡 **roda no navegador (15/out):** `scripts/build_web.sh pes2012` gera `ps2web.wasm` (77 MB, 5 min 41 s); servido em `localhost:8620`, no Chromium do Windows usa a placa de vídeo (`GPU nvidia ampere`, WebGPU, isolamento de origem ativo) e chega à tela de idioma, **sem as listras** (eram só do desenho por software). ⚠️ **Lento:** 2 a 3 quadros por segundo no arranque, ~14 na tela de idioma, com processador principal, VU e GS saturados (95%, 100%, 99%). Próxima frente: desempenho |
 | 7. Publicação | ⬜ só se ele decidir |
@@ -78,7 +78,7 @@ wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && bash 
 ## Próximo passo
 
 1. ~~A tela preta depois do vídeo~~ ✅ resolvida (vblank).
-2. Avançar pelos menus até uma partida (Marco 4), com `scripts/rodar-teste.sh` e toques programados.
+2. ~~Avançar pelos menus até uma partida~~ ✅ chega aos times perfilados. Caminho de toques: Start em 300; ✕ em 450, 600, 750, 900, 1050, 1200, 1500; Start em 3000 e 3600; ✕ a cada 150 quadros a partir de 3900.
 3. ~~As listras horizontais no fundo das caixas de menu~~ ✅ só acontecem no desenho por software; com WebGPU saem limpas.
 3. **Desempenho no navegador** (~14 quadros por segundo nos menus): medir com o perfil da página e com `PS2_PROFILE` no nativo onde o tempo vai (despacho para overlays, VU, GS).
 4. Ele pode testar já na janela nativa (comando no README; por software dentro do WSL, então lenta).
