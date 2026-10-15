@@ -173,7 +173,32 @@ int main(int argc, char **argv) {
         const Image image = Image::load(elf_path);
         const Entries entries = entries_path.empty() ? Entries{} : read_entries(entries_path);
         const Links imports = snr2_imports(image);
-        Program program = analyse(image, entries.main, dynamic_sites(imports));
+        std::deque<Image> images;
+        std::deque<Program> programs;
+
+        // Overlays first: every jal and j they make into the main program is a function entry
+        // there, found up front instead of one exploring run at a time.
+        const std::vector<Overlay> overlays = overlays_dir.empty() ? std::vector<Overlay>{} : read_overlays(overlays_dir);
+        std::vector<std::uint32_t> main_seeds = entries.main;
+        std::size_t overlay_code = 0, overlay_calls = 0;
+        for (const Overlay &o : overlays) {
+            images.push_back(Image::raw(o.base, o.bytes, {o.base + kMwo3CodeStart, o.text_end}));
+            std::vector<std::uint32_t> seeds{o.base + kMwo3CodeStart};
+            if (const auto it = entries.modules.find(o.name); it != entries.modules.end()) seeds.insert(seeds.end(), it->second.begin(), it->second.end());
+            programs.push_back(analyse(images.back(), seeds, {}));
+            overlay_code += code_size(programs.back());
+            // the whole text section, not only what the overlay's own analysis reached: functions
+            // reached through pointers still call into the main program
+            for (std::uint32_t pc = o.base + kMwo3CodeStart; pc + 4 <= o.text_end; pc += 4) {
+                const Insn i = decode(*images.back().word(pc), pc);
+                if ((i.op == Op::Jal || i.op == Op::J) && image.executable(i.jump_target())) {
+                    main_seeds.push_back(i.jump_target());
+                    ++overlay_calls;
+                }
+            }
+        }
+
+        Program program = analyse(image, main_seeds, dynamic_sites(imports));
         std::map<Op, std::size_t> histogram;
         for (std::uint32_t pc = program.base; pc < program.end; pc += 4)
             if (program.is_code(pc)) ++histogram[decode(*image.word(pc), pc).op];
@@ -185,8 +210,6 @@ int main(int argc, char **argv) {
 
         std::vector<Translation> translations{{&image, &program, imports.empty() ? nullptr : &imports, "", false, "", 0, {}}};
         const std::vector<Snr2Module> modules = modules_dir.empty() ? std::vector<Snr2Module>{} : read_modules(modules_dir);
-        std::deque<Image> images;
-        std::deque<Program> programs;
         std::size_t module_code = 0;
         for (const Snr2Module &m : modules) {
             images.push_back(snr2_image(m));
@@ -200,22 +223,17 @@ int main(int argc, char **argv) {
             std::printf("%zu modules, code %zu instructions (%zu KiB), %zu sites in the program linked at run time\n", modules.size(), module_code,
                         module_code * 4 / 1024, imports.size());
 
-        const std::vector<Overlay> overlays = overlays_dir.empty() ? std::vector<Overlay>{} : read_overlays(overlays_dir);
-        std::size_t overlay_code = 0;
-        for (const Overlay &o : overlays) {
-            images.push_back(Image::raw(o.base, o.bytes, {o.base + kMwo3CodeStart, o.text_end}));
-            std::vector<std::uint32_t> seeds{o.base + kMwo3CodeStart};
-            if (const auto it = entries.modules.find(o.name); it != entries.modules.end()) seeds.insert(seeds.end(), it->second.begin(), it->second.end());
-            programs.push_back(analyse(images.back(), seeds, {}));
-            overlay_code += code_size(programs.back());
-            Translation t{&images.back(), &programs.back(), nullptr, "o_" + o.name + "_", false, o.name,
-                          static_cast<std::uint32_t>(o.bytes.size()), overlay_checks(o, programs.back())};
+        for (std::size_t k = 0; k < overlays.size(); ++k) {
+            const Overlay &o = overlays[k];
+            Translation t{&images[k], &programs[k], nullptr, "o_" + o.name + "_", false, o.name,
+                          static_cast<std::uint32_t>(o.bytes.size()), overlay_checks(o, programs[k])};
             t.overlay = true;
             t.base = o.base;
             translations.push_back(std::move(t));
         }
         if (!overlays.empty())
-            std::printf("%zu overlays, code %zu instructions (%zu KiB)\n", overlays.size(), overlay_code, overlay_code * 4 / 1024);
+            std::printf("%zu overlays, code %zu instructions (%zu KiB), %zu calls into the main program\n", overlays.size(), overlay_code,
+                        overlay_code * 4 / 1024, overlay_calls);
 
         if (!out.empty()) {
             CodegenOptions options;
