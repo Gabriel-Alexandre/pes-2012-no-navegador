@@ -8,7 +8,9 @@ import http.server
 import os
 import re
 import shutil
+import socket
 import sys
+import threading
 
 RECORD = None
 if '--record' in sys.argv:
@@ -110,5 +112,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-print('serving %s and %s on http://127.0.0.1:%d/' % (BUILD, DISC, PORT))
+class LoopbackV6Server(http.server.ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+
+# Serve on both loopback addresses, and only on them. Browsers on Windows try "localhost" over
+# IPv6 first; with only 127.0.0.1 bound, every new connection (one per disc read) waited ~300 ms
+# before falling back to IPv4, and the game stalled on the disc.
+print('serving %s and %s on http://localhost:%d/' % (BUILD, DISC, PORT))
+try:
+    v6 = LoopbackV6Server(('::1', PORT), Handler)
+    threading.Thread(target=v6.serve_forever, daemon=True).start()
+except OSError:
+    pass
 http.server.ThreadingHTTPServer(('127.0.0.1', PORT), Handler).serve_forever()
