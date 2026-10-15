@@ -117,6 +117,7 @@ EOF
   modules+=(--overlays "$game/overlays")
 fi
 
+[ -f "$game/patches.txt" ] && modules+=(--patches "$game/patches.txt")
 translate() { "$tools/eerecomp" "$elf" --entries "$game/entries.txt" "${modules[@]}" --out "$generated" | tail -1; }
 
 echo "== [3/6] machine code to C++"

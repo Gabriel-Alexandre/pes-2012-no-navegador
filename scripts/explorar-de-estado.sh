@@ -36,6 +36,6 @@ EOF
 )
   echo "rodada $n: ${motivo:-sem motivo registrado}, $novos entradas novas, $(ls "$out/telas" | wc -l) telas"
   [ "$novos" -gt 0 ] || break
-  "$R/build/tools/eerecomp" "$G/disc/SLES_556.58" --entries "$G/entries.txt" --overlays "$G/overlays" --out "$R/generated/pes2012" | tail -1
+  "$R/build/tools/eerecomp" "$G/disc/SLES_556.58" --entries "$G/entries.txt" --overlays "$G/overlays" --patches "$G/patches.txt" --out "$R/generated/pes2012" | tail -1
   ninja -C "$R/build/native-pes2012" ps2run > "$out/ninja.log" 2>&1 || { tail -20 "$out/ninja.log"; exit 1; }
 done

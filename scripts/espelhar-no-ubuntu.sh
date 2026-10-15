@@ -17,4 +17,7 @@ rsync -a --delete \
   --exclude /build --exclude /generated --exclude /games --exclude /tools \
   --exclude /third_party/wgpu-native --exclude /docs/media \
   "$ORIGEM" "$DESTINO"
+# correções do executável (60 Hz), lidas pelo port.sh e pelo explorar-de-estado.sh
+mkdir -p "$DESTINO/games/pes2012"
+cp "$(dirname "$ORIGEM")/config/pes2012-patches.txt" "$DESTINO/games/pes2012/patches.txt"
 echo "== espelhado em $DESTINO"

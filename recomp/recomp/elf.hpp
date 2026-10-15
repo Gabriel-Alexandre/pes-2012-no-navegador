@@ -28,6 +28,9 @@ public:
     std::optional<std::uint32_t> word(std::uint32_t address) const;
     bool executable(std::uint32_t address) const;
     void add_symbol(std::uint32_t address, std::string name) { symbols_[address] = std::move(name); }
+    // Replaces one word of the loaded image before translation (a patch file); false if the
+    // address is not in it or the word there is not the expected one.
+    bool patch(std::uint32_t address, std::uint32_t expected, std::uint32_t value);
 
 private:
     std::uint32_t entry_{};

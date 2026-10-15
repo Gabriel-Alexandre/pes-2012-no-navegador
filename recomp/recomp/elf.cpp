@@ -90,6 +90,20 @@ std::optional<std::uint32_t> Image::word(std::uint32_t address) const {
     return std::nullopt;
 }
 
+bool Image::patch(std::uint32_t address, std::uint32_t expected, std::uint32_t value) {
+    for (auto &segment : segments_) {
+        if (address >= segment.address && address - segment.address + 4 <= segment.bytes.size()) {
+            std::uint8_t *at = segment.bytes.data() + (address - segment.address);
+            std::uint32_t current;
+            std::memcpy(&current, at, 4);
+            if (current != expected) return false;
+            std::memcpy(at, &value, 4);
+            return true;
+        }
+    }
+    return false;
+}
+
 bool Image::executable(std::uint32_t address) const {
     for (const auto &segment : segments_)
         if (segment.executable && address >= segment.address && address - segment.address < segment.bytes.size())

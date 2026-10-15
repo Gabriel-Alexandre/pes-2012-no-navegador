@@ -10,8 +10,10 @@
 #include <cstring>
 #include <deque>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iterator>
+#include <sstream>
 #include <map>
 #include <set>
 #include <string>
@@ -156,7 +158,7 @@ int usage() {
 
 int main(int argc, char **argv) {
     if (argc < 2) return usage();
-    std::string elf_path = argv[1], entries_path, out, probes_path, modules_dir, overlays_dir;
+    std::string elf_path = argv[1], entries_path, out, probes_path, modules_dir, overlays_dir, patches_path;
     bool stats = false;
     for (int i = 2; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -166,11 +168,27 @@ int main(int argc, char **argv) {
         else if (arg == "--probes" && i + 1 < argc) probes_path = argv[++i];
         else if (arg == "--modules" && i + 1 < argc) modules_dir = argv[++i];
         else if (arg == "--overlays" && i + 1 < argc) overlays_dir = argv[++i];
+        else if (arg == "--patches" && i + 1 < argc) patches_path = argv[++i];
         else return usage();
     }
 
     try {
-        const Image image = Image::load(elf_path);
+        Image image = Image::load(elf_path);
+        // patch file: one "address expected value" line per word (hex), "#" starts a comment
+        if (!patches_path.empty()) {
+            std::ifstream file(patches_path);
+            std::string line;
+            while (std::getline(file, line)) {
+                if (const auto hash = line.find('#'); hash != std::string::npos) line.resize(hash);
+                std::istringstream in(line);
+                std::string a, e, v;
+                if (!(in >> a >> e >> v)) continue;
+                const auto at = static_cast<std::uint32_t>(std::stoul(a, nullptr, 16));
+                if (!image.patch(at, static_cast<std::uint32_t>(std::stoul(e, nullptr, 16)), static_cast<std::uint32_t>(std::stoul(v, nullptr, 16))))
+                    throw std::runtime_error(std::format("patch at 0x{:08X} does not match the executable", at));
+                std::printf("patched 0x%08X\n", at);
+            }
+        }
         const Entries entries = entries_path.empty() ? Entries{} : read_entries(entries_path);
         const Links imports = snr2_imports(image);
         std::deque<Image> images;
