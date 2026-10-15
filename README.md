@@ -21,7 +21,7 @@ Projeto pessoal: rodar o **PES 2012 de PlayStation 2** dentro do navegador (Chro
 
 ## Como testar nesta máquina
 
-Janela nativa (o Windows 11 abre a janela do Ubuntu sozinho):
+Janela nativa (o Windows 11 abre a janela do Ubuntu sozinho). ⚠️ **Dentro do Ubuntu do WSL não há placa de vídeo para o WebGPU** (`[gpu] no adapter`): a janela desenha por software e fica lenta. Serve para conferir se o jogo anda; para jogar, o caminho é o navegador no Windows, que usa a placa de vídeo:
 
 ```bash
 wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && build/native-pes2012/ps2run games/pes2012/disc/SLES_556.58 --disc games/pes2012/disc.iso --window'

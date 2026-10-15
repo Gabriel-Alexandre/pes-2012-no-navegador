@@ -476,7 +476,18 @@ void handle_syscall(Cpu &c, std::uint32_t pc) {
     case 0x04: halt("Exit"); break;
     case 0x06: case 0x07: halt("program asked to run another executable"); break;
     case 0x10: add_handler(c, g_intc_handlers); break;
-    case 0x11: remove_handler(c, g_intc_handlers); break;
+    case 0x11: {
+        // PES 2012's movie player adds its own vblank-start handler, then at the end calls
+        // DisableIntc(2) and removes it, although the game's own vblank handler (the frame
+        // counter its wait loop polls) is still registered on that cause. The game goes on to the
+        // title screen on the console; here the counter froze and the screen stayed black. Keep a
+        // cause enabled while a handler for it remains registered.
+        const unsigned cause = arg(c, 0);
+        remove_handler(c, g_intc_handlers);
+        if (std::any_of(g_intc_handlers.begin(), g_intc_handlers.end(), [&](const Handler &h) { return h.cause == cause; }))
+            hw::intc_set_mask(cause, true);
+        break;
+    }
     case 0x12: add_handler(c, g_dmac_handlers); break;
     case 0x13: remove_handler(c, g_dmac_handlers); break;
     case 0x14: case 0x1A: ret(c, hw::intc_set_mask(arg(c, 0), true) ? 1 : 0); break;

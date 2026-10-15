@@ -7,7 +7,7 @@
 | 0. Bancada | ✅ Windows (JDK 21, Ghidra 12.1.4 com o plugin do PS2, Node 24, REA 6.5.0 registrado no Claude Code) e Ubuntu (clang 19.1.7, 134 pacotes registrados, Emscripten 6.0.11, wgpu-native). Recompilador compilado no espelho `~/pes-work/recomp` (`eerecomp` e `vurecomp`). ⬜ O REA como ferramenta aparece só numa sessão nova do Claude Code |
 | 1. A imagem | ✅ extraída, MD5 `c6a29549273f60475a6765791886eae6` confere, em `~/pes-work/games/pes2012/disc.iso` |
 | 2. Primeira tradução | ✅ feita; ele decidiu seguir (15/out) e o suporte aos overlays `MWo3` foi construído |
-| 3. Abrir o jogo | 🟡 **o jogo desenha a tela (15/out, 8ª tentativa):** 60 s de jogo sem faltar código, tela de idioma, avisos do memory card e o vídeo de abertura. Depois do vídeo, **tela preta** (a investigar). Defeito gráfico: listras horizontais no fundo dos menus |
+| 3. Abrir o jogo | 🟡 **o jogo chega aos menus (15/out):** idioma, avisos do memory card, vídeo de abertura, **tela de título** ("PULSA UN BOTÓN") e a **escolha de dificuldade**. A tela preta depois do vídeo era o vblank desligado pelo reprodutor de vídeo (ver `docs/RECOMPILADOR.md`). Defeito gráfico: listras horizontais no fundo das caixas de menu |
 | 4. A partida | ⬜ |
 | 5. Som e controle | ⬜ |
 | 6. Navegador | ⬜ |
@@ -77,6 +77,11 @@ wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && bash 
 
 ## Próximo passo
 
-1. Entender a tela preta depois do vídeo de abertura (tela de título esperando ou travamento): rodar mais quadros, com `--trace-threads`, e olhar quais threads esperam o quê.
-2. As listras horizontais no fundo dos menus (efeito gráfico do GS).
-3. Ele pode testar já na janela nativa (comando no README).
+1. ~~A tela preta depois do vídeo~~ ✅ resolvida (vblank).
+2. Avançar pelos menus até uma partida (Marco 4), com `scripts/rodar-teste.sh` e toques programados.
+3. As listras horizontais no fundo das caixas de menu (efeito gráfico do GS).
+4. Ele pode testar já na janela nativa (comando no README; por software dentro do WSL, então lenta).
+
+## Como testar sem janela
+
+`scripts/rodar-teste.sh <nome> <quadros> [--press QUADRO:BOTAO ...] [--trace-syscalls] [--trace-io]` roda o jogo escondido e guarda as telas (uma a cada 150 quadros) e o log em `~/pes-work/testes/<nome>/`. Exemplo que chega à escolha de dificuldade: `--press 300:start` e ✕ em 450, 600, 750, 900, 1050, 1200 e 1500, depois Start a partir de 3000.
