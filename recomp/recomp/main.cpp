@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
         std::vector<std::uint32_t> main_seeds = entries.main;
 
         // Overlays sit at fixed addresses, so the main program holds their function addresses
-        // itself: as words in its data and as lui + addiu/ori pairs in its code.
+        // itself: as jal and j targets, as words in its data and as lui + addiu/ori pairs.
         std::vector<std::uint32_t> main_pointers;
         if (!overlays.empty())
             for (const auto &segment : image.segments()) {
@@ -191,7 +191,13 @@ int main(int argc, char **argv) {
                 std::memcpy(w.data(), segment.bytes.data(), n * 4);
                 for (std::size_t k = 0; k < n; ++k) {
                     main_pointers.push_back(w[k]);
-                    if (!segment.executable || (w[k] >> 26) != 0x0Fu) continue;  // lui rt, hi
+                    if (!segment.executable) continue;
+                    if ((w[k] >> 26) == 0x02u || (w[k] >> 26) == 0x03u) {  // j / jal straight into an overlay slot
+                        const std::uint32_t pc = segment.address + static_cast<std::uint32_t>(4 * k);
+                        main_pointers.push_back(((pc + 4u) & 0xF0000000u) | ((w[k] & 0x03FFFFFFu) << 2));
+                        continue;
+                    }
+                    if ((w[k] >> 26) != 0x0Fu) continue;  // lui rt, hi
                     const std::uint32_t rt = (w[k] >> 16) & 31u, hi = w[k] << 16;
                     for (std::size_t j = k + 1; j < std::min(n, k + 12); ++j) {
                         const std::uint32_t op = w[j] >> 26;
@@ -203,7 +209,7 @@ int main(int argc, char **argv) {
             }
         std::sort(main_pointers.begin(), main_pointers.end());
         main_pointers.erase(std::unique(main_pointers.begin(), main_pointers.end()), main_pointers.end());
-        std::size_t overlay_code = 0, overlay_calls = 0;
+        std::size_t overlay_code = 0, overlay_calls = 0, seeded_from_main = 0;
         for (const Overlay &o : overlays) {
             images.push_back(Image::raw(o.base, o.bytes, {o.base + kMwo3CodeStart, o.text_end}));
             std::vector<std::uint32_t> seeds{o.base + kMwo3CodeStart};
@@ -223,7 +229,10 @@ int main(int argc, char **argv) {
                 if (t % 4 || t < o.base + kMwo3CodeStart + 8) continue;
                 const std::uint32_t here = *images.back().word(t), before = *images.back().word(t - 4), before2 = *images.back().word(t - 8);
                 const bool prologue = (here >> 16) == 0x27BDu && (here & 0x8000u);
-                if (before2 == 0x03E00008u || (before == 0 && before2 == 0) || prologue) seeds.push_back(t);
+                if (before2 == 0x03E00008u || (before == 0 && before2 == 0) || prologue) {
+                    seeds.push_back(t);
+                    ++seeded_from_main;
+                }
             }
             programs.push_back(analyse(images.back(), seeds, {}));
             overlay_code += code_size(programs.back());
@@ -272,8 +281,8 @@ int main(int argc, char **argv) {
             translations.push_back(std::move(t));
         }
         if (!overlays.empty())
-            std::printf("%zu overlays, code %zu instructions (%zu KiB), %zu calls into the main program\n", overlays.size(), overlay_code,
-                        overlay_code * 4 / 1024, overlay_calls);
+            std::printf("%zu overlays, code %zu instructions (%zu KiB), %zu calls into the main program, %zu entries seeded from it\n",
+                        overlays.size(), overlay_code, overlay_code * 4 / 1024, overlay_calls, seeded_from_main);
 
         if (!out.empty()) {
             CodegenOptions options;
