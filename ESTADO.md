@@ -85,4 +85,6 @@ wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && bash 
 
 ## Como testar sem janela
 
+**Explorar a partir de um estado salvo** (para não refazer os ~10 min de menus e pré-partida a cada rodada): `scripts/explorar-de-estado.sh <estado> <quadro final> <rodadas> [--press ...]`. O estado guarda a contagem de quadros, então o quadro final e os toques são absolutos. Para salvar: `rodar-teste.sh` com `--save-state QUADRO:caminho`. ⚠️ O limite de quadros precisa ser **maior** que o quadro do salvamento: no mesmo quadro, o executor para antes de salvar. Estado do pontapé inicial: `~/pes-work/estados/pontape.state` (quadro 12.900).
+
 `scripts/rodar-teste.sh <nome> <quadros> [--press QUADRO:BOTAO ...] [--trace-syscalls] [--trace-io]` roda o jogo escondido e guarda as telas (uma a cada 150 quadros) e o log em `~/pes-work/testes/<nome>/`. Exemplo que chega à escolha de dificuldade: `--press 300:start` e ✕ em 450, 600, 750, 900, 1050, 1200 e 1500, depois Start a partir de 3000.
