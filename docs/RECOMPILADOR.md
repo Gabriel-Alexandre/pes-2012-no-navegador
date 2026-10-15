@@ -26,4 +26,4 @@
 
 | Data | Arquivo | Mudança | Por quê |
 |---|---|---|---|
-| | | (nada ainda) | |
+| 15/out/2026 | `host/window.cpp` | se o SDL for anterior ao 2.26, `SDL_GetWindowSizeInPixels` vira `SDL_GetWindowSize` | o Ubuntu 22.04 traz o SDL 2.0.20, que não tem a função; a janela do executor nativo não compilava. Sem escala de tela alta, os dois dão o mesmo tamanho |

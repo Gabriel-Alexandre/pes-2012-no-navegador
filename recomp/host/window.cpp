@@ -15,6 +15,12 @@
 #include <thread>
 #include <vector>
 
+// SDL_GetWindowSizeInPixels arrived in SDL 2.26; Ubuntu 22.04 ships 2.0.20.
+// Without HiDPI scaling the window size in pixels equals the window size.
+#if !SDL_VERSION_ATLEAST(2, 26, 0)
+#define SDL_GetWindowSizeInPixels SDL_GetWindowSize
+#endif
+
 namespace {
 
 enum Button : std::uint16_t {
