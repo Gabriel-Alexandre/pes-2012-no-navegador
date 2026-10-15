@@ -14,6 +14,7 @@ Registro feito **no mesmo passo** de cada instalação, para remover tudo de uma
 | 15/out/2026 | plugin **ghidra-emotionengine-reloaded v2.1.38** (processador do PS2) | `~\scoop\apps\ghidra\current\Ghidra\Extensions\ghidra-emotionengine-reloaded` | 1 MB | sai junto com o Ghidra |
 | 15/out/2026 | **Node 24.22** (só para o REA; o Node 22.18 do sistema não foi tocado) | `~\scoop\apps\nodejs-lts` | 102 MB | `scoop uninstall nodejs-lts` |
 | 15/out/2026 | **REA 6.5.0** (pacote `rea-agents`, roda por `npx`) | cache do npm do Node do scoop | | sai junto com o Node do scoop |
+| 15/out/2026 | pasta servida pelo Windows: a versão de navegador (~100 MB), a **imagem do disco (2,6 GB)** e o estado do pontapé inicial (42 MB), criada por `scripts/servir-no-windows.ps1` | `C:\Users\Gabriel\pes-work-windows` | apagar a pasta (o `desinstalar.ps1` faz) |
 | 15/out/2026 | registro do REA no Claude Code | `~\.claude.json`, chave `mcpServers.rea` | | apagar a chave `rea` (backup do arquivo antes do REA: `~\.claude.json.rea.backup`) |
 | 15/out/2026 | skill do REA no Claude Code | `~\.claude\skills\reverse-engineer-anything` | | apagar a pasta |
 

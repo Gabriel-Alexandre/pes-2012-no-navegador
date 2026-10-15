@@ -1,4 +1,4 @@
-# Desfaz, no Windows, tudo o que docs/INSTALADOS.md registra.
+﻿# Desfaz, no Windows, tudo o que docs/INSTALADOS.md registra.
 # O Ubuntu se limpa com scripts/desinstalar-ubuntu.sh (veja docs/INSTALADOS.md).
 # Rodar: powershell -File scripts\desinstalar.ps1
 
@@ -15,6 +15,10 @@ if (Test-Path $skill) { Remove-Item -Recurse -Force $skill -Confirm:$false; Writ
 Write-Host '== scoop: Ghidra (com o plugin do PS2), JDK 21 e Node 24'
 scoop uninstall ghidra temurin21-jdk nodejs-lts
 scoop bucket rm java
+
+Write-Host '== pasta servida pelo Windows (versão de navegador e imagem do disco)'
+$servida = Join-Path $env:USERPROFILE 'pes-work-windows'
+if (Test-Path $servida) { Remove-Item -Recurse -Force $servida -Confirm:$false; Write-Host 'pasta removida' }
 
 Write-Host '== variável GHIDRA_INSTALL_DIR'
 [Environment]::SetEnvironmentVariable('GHIDRA_INSTALL_DIR', $null, 'User')

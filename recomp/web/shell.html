@@ -511,6 +511,8 @@ function webgpuHelp(onCpu) {
 }
 
 async function chooseGpu() {
+  // ?nowait (diagnostic): skip the presentation check, which waits on animation frames that a hidden page never gets
+  if (params.has('nowait')) return 'GPU, presentation check skipped';
   if (!navigator.gpu) {
     Module.gpuHelp = webgpuHelp(false);
     return 'WebGPU unavailable, software renderer';
@@ -552,7 +554,7 @@ var Module = {
   arguments: ['/game/core.elf'].concat(params.has('arg') ? ['--arg', params.get('arg')] : [], params.getAll('press').flatMap((p) => p.split(',').flatMap((x) => ['--press', x]))),
   discUrl: params.get('disc') || 'disc.iso',
   stateUrl: params.get('state'),
-  noSurface: params.has('nosurface'),
+  noSurface: params.has('nosurface'), noWait: params.has('nowait'),
   noCard: params.has('nocard'),
   presentCopy: params.has('copy'),
   print: (text) => console.log(text),

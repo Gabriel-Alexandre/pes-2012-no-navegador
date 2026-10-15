@@ -427,7 +427,11 @@ int main(int argc, char **argv) {
         ps2web_blit(rgba, static_cast<int>(width), static_cast<int>(height));
     };
     const std::function<void(const std::uint32_t *, std::uint32_t, std::uint32_t)> none;
+    // ?nowait (diagnostic): do not wait for each frame to be shown, so the emulator's own speed
+    // can be measured in a page the browser throttles (a hidden tab gets ~1 animation frame/s)
+    static const bool no_wait = EM_ASM_INT({ return Module.noWait ? 1 : 0; });
     const std::function<void()> wait_shown = [] {
+        if (no_wait) return;
         static int since_skip = 0;
         static double window_start = 0.0, window_gpu = 0.0, gpu_load = 1.0;
         const double start = emscripten_get_now();

@@ -27,11 +27,15 @@ Janela nativa (o Windows 11 abre a janela do Ubuntu sozinho). ⚠️ **Dentro do
 wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && build/native-pes2012/ps2run games/pes2012/disc/SLES_556.58 --disc games/pes2012/disc.iso --window'
 ```
 
-No navegador (depois de gerar a versão web com o `port.sh` sem `--native-only`), abrir `http://localhost:8620` no Chrome do Windows:
+**No navegador (o jeito de jogar).** Servir pelo Windows, não pelo Ubuntu: pelo repasse de rede do WSL cada leitura do disco ficava lenta. O script copia a versão de navegador e a imagem para `C:\Users\Gabriel\pes-work-windows` e sobe o servidor:
 
 ```bash
-wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && python3 scripts/serve.py build/web-pes2012 games/pes2012/disc.iso'
+powershell -ExecutionPolicy Bypass -File C:\Users\Gabriel\Downloads\repositorios\pes-2012-no-navegador\scripts\servir-no-windows.ps1
 ```
+
+Depois, abrir `http://localhost:8620` no **Chrome do Windows**, com a aba **visível**, e clicar em **Start**. Medido em 15/out: **50 quadros por segundo** (a velocidade do PS2 em PAL) na partida, com folga de mais da metade do processador.
+
+Opções de diagnóstico no endereço: `?nowait` (não espera cada quadro ser exibido; serve para medir com a aba escondida), `?state=pontape.state` (começa no pontapé inicial, se o arquivo estiver na pasta servida) e `?press=QUADRO:BOTAO,...` (toques programados).
 
 | Tecla | PS2 |
 |---|---|
