@@ -26,4 +26,5 @@
 
 | Data | Arquivo | Mudança | Por quê |
 |---|---|---|---|
+| 15/out/2026 | `runtime/src/system.cpp` (`load_elf`) | segmento **sem bytes no arquivo** que passa da RAM principal é ignorado, com aviso, em vez de recusar o executável inteiro | o `SLES_556.58` tem 70 segmentos (overlays da Konami) e o último fica em `0x03000000` (48 MB), `filesz 0`, `memsz 0x800`, sobra de um script de link de kit de desenvolvimento. O carregador do console só copia os bytes do arquivo. Sem isso: `cannot load` e o jogo não ligava |
 | 15/out/2026 | `host/window.cpp` | se o SDL for anterior ao 2.26, `SDL_GetWindowSizeInPixels` vira `SDL_GetWindowSize` | o Ubuntu 22.04 traz o SDL 2.0.20, que não tem a função; a janela do executor nativo não compilava. Sem escala de tela alta, os dois dão o mesmo tamanho |

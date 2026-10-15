@@ -325,6 +325,13 @@ bool load_elf(const std::string &path, std::uint32_t &entry) {
         const std::size_t ph = phoff + i * u16(42);
         if (u32(ph) != 1) continue;
         const std::uint32_t offset = u32(ph + 4), vaddr = physical(u32(ph + 8)), filesz = u32(ph + 16), memsz = u32(ph + 20);
+        // The console's loader copies only file bytes, so an empty segment that lies past
+        // main RAM (PES 2012 ends with one at 0x03000000, left by a devkit link script) is harmless.
+        if (filesz == 0 && vaddr + memsz > kRamSize) {
+            if (vaddr < kRamSize) std::memset(g_ram + vaddr, 0, kRamSize - vaddr);
+            std::fprintf(stderr, "[elf] skipping empty segment at 0x%08x (+0x%x) past main RAM\n", vaddr, memsz);
+            continue;
+        }
         if (vaddr + memsz > kRamSize || offset + filesz > data.size()) return false;
         std::memcpy(g_ram + vaddr, data.data() + offset, filesz);
         std::memset(g_ram + vaddr + filesz, 0, memsz - filesz);
