@@ -185,6 +185,12 @@ int main(int argc, char **argv) {
             images.push_back(Image::raw(o.base, o.bytes, {o.base + kMwo3CodeStart, o.text_end}));
             std::vector<std::uint32_t> seeds{o.base + kMwo3CodeStart};
             if (const auto it = entries.modules.find(o.name); it != entries.modules.end()) seeds.insert(seeds.end(), it->second.begin(), it->second.end());
+            // a word in the overlay's data that points into its own code is a function pointer
+            // (the title screen's callback tables are reached that way, one per exploring run otherwise)
+            for (std::uint32_t at = o.text_end & ~3u; at + 4 <= o.base + o.bytes.size(); at += 4) {
+                const std::uint32_t target = *images.back().word(at);
+                if (target % 4 == 0 && target >= o.base + kMwo3CodeStart && target < o.text_end) seeds.push_back(target);
+            }
             programs.push_back(analyse(images.back(), seeds, {}));
             overlay_code += code_size(programs.back());
             // the whole text section, not only what the overlay's own analysis reached: functions
