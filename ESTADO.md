@@ -6,8 +6,8 @@
 |---|---|
 | 0. Bancada | ✅ Windows (JDK 21, Ghidra 12.1.4 com o plugin do PS2, Node 24, REA 6.5.0 registrado no Claude Code) e Ubuntu (clang 19.1.7, 134 pacotes registrados, Emscripten 6.0.11, wgpu-native). Recompilador compilado no espelho `~/pes-work/recomp` (`eerecomp` e `vurecomp`). ⬜ O REA como ferramenta aparece só numa sessão nova do Claude Code |
 | 1. A imagem | ✅ extraída, MD5 `c6a29549273f60475a6765791886eae6` confere, em `~/pes-work/games/pes2012/disc.iso` |
-| 2. Primeira tradução | 🟡 **feita, esperando a decisão dele** (ver "O que a primeira tradução mostrou") |
-| 3. Abrir o jogo | ⬜ |
+| 2. Primeira tradução | ✅ feita; ele decidiu seguir (15/out) e o suporte aos overlays `MWo3` foi construído |
+| 3. Abrir o jogo | 🟡 **o jogo desenha a tela (15/out, 8ª tentativa):** 60 s de jogo sem faltar código, tela de idioma, avisos do memory card e o vídeo de abertura. Depois do vídeo, **tela preta** (a investigar). Defeito gráfico: listras horizontais no fundo dos menus |
 | 4. A partida | ⬜ |
 | 5. Som e controle | ⬜ |
 | 6. Navegador | ⬜ |
@@ -46,6 +46,23 @@ Suporte a **overlays de endereço fixo** no recompilador:
 3. No executor, quando o código cair numa vaga, descobrir **qual overlay está carregada agora** comparando palavras de assinatura na memória (o mesmo princípio dos `checks` do SNR2, sem o cabeçalho) e despachar para a tradução certa.
 4. Rodar de novo e ver o próximo ponto de parada.
 
+## O suporte aos overlays (15/out/2026, tentativas 4 a 8)
+
+O que foi preciso, em ordem (detalhe em `docs/RECOMPILADOR.md`):
+
+1. **Não traduzir zeros como código** (`elf.cpp`): as vagas vazias viravam um escorregador de `nop`.
+2. **Ler e traduzir os 30 overlays com código** (`--overlays`), cada um no endereço dele, e **reconhecer na memória qual está carregado** (8 palavras de assinatura). Funcionou de primeira: a falta veio anotada como `memorycard:691ff0`.
+3. **Sementes, para não achar uma função por rodada:** os `jal`/`j` dos overlays para o programa principal (83.289), os ponteiros nos dados do overlay, e os `jal`/`j`, palavras e pares `lui`+`addiu` do programa principal que caem num começo de função do overlay (1.260 entradas).
+
+Resultado da 8ª tentativa: **uma rodada, 3.600 quadros, nenhum código faltando**, 12 capturas de tela.
+
+| Quadros | Tela |
+|---|---|
+| 300 a 600 | escolha de idioma (com listras horizontais no fundo) |
+| 900 a 1500 | avisos do memory card |
+| 1800 a 2400 | vídeo de abertura |
+| 2700 a 3600 | preta |
+
 ## Como compilar (o arranjo que funciona)
 
 O código se edita em `recomp/` no Windows; a compilação roda no espelho do Ubuntu:
@@ -60,4 +77,6 @@ wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && bash 
 
 ## Próximo passo
 
-🔴 **Decisão dele:** seguir para o suporte a overlays `MWo3` (seção acima) ou parar aqui. Se seguir: **sessão nova**, começando por este arquivo; o REA já aparece como ferramenta numa sessão nova.
+1. Entender a tela preta depois do vídeo de abertura (tela de título esperando ou travamento): rodar mais quadros, com `--trace-threads`, e olhar quais threads esperam o quê.
+2. As listras horizontais no fundo dos menus (efeito gráfico do GS).
+3. Ele pode testar já na janela nativa (comando no README).

@@ -19,6 +19,29 @@ Projeto pessoal: rodar o **PES 2012 de PlayStation 2** dentro do navegador (Chro
 - O código fica no Windows (`Downloads/repositorios/pes-2012-no-navegador`). **A compilação roda no Ubuntu (WSL)**, que é onde o recompilador foi testado, numa **cópia espelhada** em `~/pes-work/recomp`: `scripts/espelhar-no-ubuntu.sh` sincroniza antes de cada build. As pastas pesadas (`games/` com a imagem, `generated/`, `build/`, `tools/` com o Emscripten, `third_party/wgpu-native`) só existem no espelho.
 - `scripts/`: instalação, remoção e o verificador de que nada do jogo entra no git.
 
+## Como testar nesta máquina
+
+Janela nativa (o Windows 11 abre a janela do Ubuntu sozinho):
+
+```bash
+wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && build/native-pes2012/ps2run games/pes2012/disc/SLES_556.58 --disc games/pes2012/disc.iso --window'
+```
+
+No navegador (depois de gerar a versão web com o `port.sh` sem `--native-only`), abrir `http://localhost:8620` no Chrome do Windows:
+
+```bash
+wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && python3 scripts/serve.py build/web-pes2012 games/pes2012/disc.iso'
+```
+
+| Tecla | PS2 |
+|---|---|
+| Setas | direcional |
+| Z / X / A / S | ✕ / ◯ / ▢ / △ |
+| Q / W · 1 / 2 | L1 / R1 · L2 / R2 |
+| Enter / Backspace | Start / Select |
+| I J K L (navegador) | analógico esquerdo |
+| F11 (janela) · F (navegador) | tela cheia |
+
 ## Regras do projeto
 
 1. Nada do jogo no git, em nenhum commit.
