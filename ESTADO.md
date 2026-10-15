@@ -10,7 +10,7 @@
 | 3. Abrir o jogo | 🟡 **o jogo chega aos menus (15/out):** idioma, avisos do memory card, vídeo de abertura, **tela de título** ("PULSA UN BOTÓN") e a **escolha de dificuldade**. A tela preta depois do vídeo era o vblank desligado pelo reprodutor de vídeo (ver `docs/RECOMPILADOR.md`). Defeito gráfico: listras horizontais no fundo das caixas de menu |
 | 4. A partida | ⬜ |
 | 5. Som e controle | ⬜ |
-| 6. Navegador | ⬜ |
+| 6. Navegador | 🟡 **roda no navegador (15/out):** `scripts/build_web.sh pes2012` gera `ps2web.wasm` (77 MB, 5 min 41 s); servido em `localhost:8620`, no Chromium do Windows usa a placa de vídeo (`GPU nvidia ampere`, WebGPU, isolamento de origem ativo) e chega à tela de idioma, **sem as listras** (eram só do desenho por software). ⚠️ **Lento:** 2 a 3 quadros por segundo no arranque, ~14 na tela de idioma, com processador principal, VU e GS saturados (95%, 100%, 99%). Próxima frente: desempenho |
 | 7. Publicação | ⬜ só se ele decidir |
 | 8. Bomba Patch | ⬜ bônus |
 
@@ -79,7 +79,8 @@ wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && bash 
 
 1. ~~A tela preta depois do vídeo~~ ✅ resolvida (vblank).
 2. Avançar pelos menus até uma partida (Marco 4), com `scripts/rodar-teste.sh` e toques programados.
-3. As listras horizontais no fundo das caixas de menu (efeito gráfico do GS).
+3. ~~As listras horizontais no fundo das caixas de menu~~ ✅ só acontecem no desenho por software; com WebGPU saem limpas.
+3. **Desempenho no navegador** (~14 quadros por segundo nos menus): medir com o perfil da página e com `PS2_PROFILE` no nativo onde o tempo vai (despacho para overlays, VU, GS).
 4. Ele pode testar já na janela nativa (comando no README; por software dentro do WSL, então lenta).
 
 ## Como testar sem janela

@@ -39,6 +39,8 @@ O `rea setup` registrou `npx` pelo nome. No Windows o `PATH` da máquina vem ant
 | 15/out/2026 | `rsync` | já vinha no Ubuntu | não remover (é do sistema) |
 | 15/out/2026 (baixado pelo `setup.sh` do recompilador) | Emscripten 6.0.11 (**1,7 GB**) | `~/pes-work/recomp/tools/emsdk` | sai com `~/pes-work` |
 | 15/out/2026 (baixado pelo `setup.sh` do recompilador) | wgpu-native v29.0.1.1 (59 MB) | `~/pes-work/recomp/third_party/wgpu-native` | sai com `~/pes-work` |
+| 15/out/2026 (baixado pelo Emscripten no primeiro build web) | porta `emdawnwebgpu` v20260423 (WebGPU para o Emscripten) | cache do Emscripten, dentro de `~/pes-work/recomp/tools/emsdk` | sai com `~/pes-work` |
+| 15/out/2026 | versão de navegador do jogo: `ps2web.wasm` (77 MB; 18 MB comprimido) | `~/pes-work/recomp/build/web-pes2012` (fora do git) | sai com `~/pes-work` |
 
 ## Devolver o espaço do Ubuntu ao Windows
 
