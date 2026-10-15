@@ -7,7 +7,7 @@ set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$REPO/docs/apt-instalados.txt"
 if [ -f "$LOG" ]; then
-  pacotes=$(grep -v '^#' "$LOG" | tr '\n' ' ')
+  pacotes=$(grep -v '^#' "$LOG" | tr -d '\r' | tr '\n' ' ')
   [ -n "$pacotes" ] && apt-get remove -y --purge $pacotes
   apt-get autoremove -y
 fi

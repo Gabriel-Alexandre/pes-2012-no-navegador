@@ -35,9 +35,10 @@ O `rea setup` registrou `npx` pelo nome. No Windows o `PATH` da máquina vem ant
 |---|---|---|---|
 | 15/out/2026 | pasta de trabalho: imagem do disco, código gerado, build | `~/pes-work` | `scripts/desinstalar-ubuntu.sh` apaga |
 | 15/out/2026 | **134 pacotes**: clang 19.1.7 + libc++ 19 (do `apt.llvm.org`), CMake, Ninja, unzip, p7zip, SDL2, xz e as dependências deles | pacotes do sistema; lista exata em [`apt-instalados.txt`](apt-instalados.txt), gerada pelo próprio script | `scripts/desinstalar-ubuntu.sh` remove a lista, o repositório do LLVM (`/etc/apt/sources.list.d/llvm-19.list`) e a chave dele |
-| 15/out/2026 | links das pastas pesadas: `recomp/{games,generated,build,tools}` e `recomp/third_party/wgpu-native` apontam para `~/pes-work/...` | dentro do repositório (ignorados pelo git) | apagar os links; somem sozinhos se o repositório for apagado |
-| ⬜ (baixado pelo `setup.sh` do recompilador) | Emscripten 6.0.11 | `~/pes-work/tools/emsdk` | sai com `~/pes-work` |
-| ⬜ (baixado pelo `setup.sh` do recompilador) | wgpu-native v29.0.1.1 | `~/pes-work/third_party/wgpu-native` | sai com `~/pes-work` |
+| 15/out/2026 | espelho do recompilador, onde ele compila: código + `games/` (a imagem), `generated/`, `build/`, `tools/emsdk`, `third_party/wgpu-native` | `~/pes-work/recomp` | sai com `~/pes-work` |
+| 15/out/2026 | `rsync` | já vinha no Ubuntu | não remover (é do sistema) |
+| 15/out/2026 (baixado pelo `setup.sh` do recompilador) | Emscripten 6.0.11 (**1,7 GB**) | `~/pes-work/recomp/tools/emsdk` | sai com `~/pes-work` |
+| 15/out/2026 (baixado pelo `setup.sh` do recompilador) | wgpu-native v29.0.1.1 (59 MB) | `~/pes-work/recomp/third_party/wgpu-native` | sai com `~/pes-work` |
 
 ## Devolver o espaço do Ubuntu ao Windows
 

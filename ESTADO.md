@@ -4,7 +4,7 @@
 
 | Marco | Estado |
 |---|---|
-| 0. Bancada | 🟡 Windows pronto (JDK 21, Ghidra 12.1.4 com o plugin do PS2, Node 24, REA 6.5.0 registrado no Claude Code). Ubuntu pronto (clang 19.1.7, 134 pacotes registrados). ⬜ Compilando o recompilador (`setup.sh`) |
+| 0. Bancada | ✅ Windows (JDK 21, Ghidra 12.1.4 com o plugin do PS2, Node 24, REA 6.5.0 registrado no Claude Code) e Ubuntu (clang 19.1.7, 134 pacotes registrados, Emscripten 6.0.11, wgpu-native). Recompilador compilado no espelho `~/pes-work/recomp` (`eerecomp` e `vurecomp`). ⬜ O REA como ferramenta aparece só numa sessão nova do Claude Code |
 | 1. A imagem | ✅ extraída, MD5 `c6a29549273f60475a6765791886eae6` confere, em `~/pes-work/games/pes2012/disc.iso` |
 | 2. Primeira tradução | ⬜ |
 | 3. Abrir o jogo | ⬜ |
@@ -22,9 +22,18 @@
 - **O executável `SLES_556.58` não tem símbolos** (`.symtab` vazia, seções sem nome, um segmento de código de 3,3 MB a partir de `0x00100000`). No Ghidra, os nomes vão depender de assinaturas do SDK do PS2.
 - O áudio é o **middleware CRI ADX** compilado em **fev/2005** (ADXT 9.44, ADXF 7.30, ADXPS2 2.60): o motor do PES de PS2 vem dessa época.
 
+## Como compilar (o arranjo que funciona)
+
+O código se edita em `recomp/` no Windows; a compilação roda no espelho do Ubuntu:
+
+```bash
+wsl -d Ubuntu-22.04 -e bash scripts/espelhar-no-ubuntu.sh      # sincroniza recomp/ -> ~/pes-work/recomp
+wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && bash scripts/port.sh pes2012 games/pes2012/disc.iso --native-only'
+```
+
+⚠️ Use `bash --norc --noprofile`: o `.bashrc` dele roda `sudo service docker start`, que trava esperando senha.
+⚠️ **Não volte a usar links** para `build/`: o CMake grava caminhos relativos ao link e o ninja entra em laço (`build.ninja still dirty after 100 tries`).
+
 ## Próximo passo
 
-1. Ele roda a linha de `scripts/instalar-ubuntu.sh` com a senha (terminal aberto na sessão).
-2. Ligar `recomp/{games,generated,build,tools,third_party/wgpu-native}` a `~/pes-work` e rodar `recomp/scripts/setup.sh` no Ubuntu.
-3. Reabrir a sessão do Claude Code para o REA aparecer, conferir `rea doctor` com o plugin do PS2.
-4. Marco 2: `scripts/port.sh pes2012 ~/pes-work/games/pes2012/disc.iso --native-only` primeiro, para ler a lista do que falta.
+Marco 2: a primeira tradução (`port.sh ... --native-only`), com log em `~/pes-work/logs/`.

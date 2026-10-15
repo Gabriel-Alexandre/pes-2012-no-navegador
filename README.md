@@ -16,7 +16,7 @@ Projeto pessoal: rodar o **PES 2012 de PlayStation 2** dentro do navegador (Chro
 ## Como está montado
 
 - `recomp/`: o [ps2-web-recomp](https://github.com/snuri00/ps2-web-recomp) (licença MIT, mantida em `recomp/LICENSE`), copiado para dentro deste repositório. As nossas correções para o PES vão aqui e ficam registradas em `docs/RECOMPILADOR.md`.
-- O código fica no Windows (`Downloads/repositorios/pes-2012-no-navegador`). **A compilação roda no Ubuntu (WSL)**, que é onde o recompilador foi testado. As pastas pesadas (`games/`, `generated/`, `build/`, `tools/`) do `recomp/` são links para `~/pes-work/` dentro do Ubuntu.
+- O código fica no Windows (`Downloads/repositorios/pes-2012-no-navegador`). **A compilação roda no Ubuntu (WSL)**, que é onde o recompilador foi testado, numa **cópia espelhada** em `~/pes-work/recomp`: `scripts/espelhar-no-ubuntu.sh` sincroniza antes de cada build. As pastas pesadas (`games/` com a imagem, `generated/`, `build/`, `tools/` com o Emscripten, `third_party/wgpu-native`) só existem no espelho.
 - `scripts/`: instalação, remoção e o verificador de que nada do jogo entra no git.
 
 ## Regras do projeto
