@@ -34,7 +34,8 @@ O `rea setup` registrou `npx` pelo nome. No Windows o `PATH` da máquina vem ant
 | Data | O quê | Onde | Como remover |
 |---|---|---|---|
 | 15/out/2026 | pasta de trabalho: imagem do disco, código gerado, build | `~/pes-work` | `scripts/desinstalar-ubuntu.sh` apaga |
-| ⬜ (espera a senha dele) | clang 19 + libc++ 19 (do `apt.llvm.org`), CMake, Ninja, unzip, p7zip, SDL2, xz | pacotes do sistema; lista exata em `docs/apt-instalados.txt`, gerada pelo próprio script | `scripts/desinstalar-ubuntu.sh` remove a lista, o repositório do LLVM e a chave dele |
+| 15/out/2026 | **134 pacotes**: clang 19.1.7 + libc++ 19 (do `apt.llvm.org`), CMake, Ninja, unzip, p7zip, SDL2, xz e as dependências deles | pacotes do sistema; lista exata em [`apt-instalados.txt`](apt-instalados.txt), gerada pelo próprio script | `scripts/desinstalar-ubuntu.sh` remove a lista, o repositório do LLVM (`/etc/apt/sources.list.d/llvm-19.list`) e a chave dele |
+| 15/out/2026 | links das pastas pesadas: `recomp/{games,generated,build,tools}` e `recomp/third_party/wgpu-native` apontam para `~/pes-work/...` | dentro do repositório (ignorados pelo git) | apagar os links; somem sozinhos se o repositório for apagado |
 | ⬜ (baixado pelo `setup.sh` do recompilador) | Emscripten 6.0.11 | `~/pes-work/tools/emsdk` | sai com `~/pes-work` |
 | ⬜ (baixado pelo `setup.sh` do recompilador) | wgpu-native v29.0.1.1 | `~/pes-work/third_party/wgpu-native` | sai com `~/pes-work` |
 
