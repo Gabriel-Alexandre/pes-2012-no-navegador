@@ -36,6 +36,7 @@ O `rea setup` registrou `npx` pelo nome. No Windows o `PATH` da máquina vem ant
 |---|---|---|---|
 | 15/out/2026 | pasta de trabalho: imagem do disco, código gerado, build | `~/pes-work` | `scripts/desinstalar-ubuntu.sh` apaga |
 | 15/out/2026 | **134 pacotes**: clang 19.1.7 + libc++ 19 (do `apt.llvm.org`), CMake, Ninja, unzip, p7zip, SDL2, xz e as dependências deles | pacotes do sistema; lista exata em [`apt-instalados.txt`](apt-instalados.txt), gerada pelo próprio script | `scripts/desinstalar-ubuntu.sh` remove a lista, o repositório do LLVM (`/etc/apt/sources.list.d/llvm-19.list`) e a chave dele |
+| 15/out/2026 | **Vulkan por software do Mesa** (lavapipe, `mesa-vulkan-drivers` 23.2.1 e `libvulkan1`), **sem instalar no sistema**: baixado com `apt-get download` (sem senha) e extraído com `dpkg -x`; ativa-se por sessão com `. ~/pes-work/vulkan-local/env.sh` | `~/pes-work/vulkan-local` (~40 MB) | sai com `~/pes-work`; nenhum pacote do sistema mudou |
 | 15/out/2026 | espelho do recompilador, onde ele compila: código + `games/` (a imagem), `generated/`, `build/`, `tools/emsdk`, `third_party/wgpu-native` | `~/pes-work/recomp` | sai com `~/pes-work` |
 | 15/out/2026 | `rsync` | já vinha no Ubuntu | não remover (é do sistema) |
 | 15/out/2026 (baixado pelo `setup.sh` do recompilador) | Emscripten 6.0.11 (**1,7 GB**) | `~/pes-work/recomp/tools/emsdk` | sai com `~/pes-work` |
