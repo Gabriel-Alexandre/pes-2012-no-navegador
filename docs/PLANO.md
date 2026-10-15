@@ -40,7 +40,8 @@ Quando o jogo travar numa peça do PS2 que falta, o diagnóstico é feito lendo 
 
 ## Os riscos, na ordem em que aparecem
 
-1. **Módulos que nenhum jogo testado usou.** Os suspeitos, pelo disco: `USBD`, `USBKEYBD` e `USBPSPCM` (USB: teclado e ligação com o PSP), `CRI_ADXI` (áudio CRI ADX, a narração), `CDVDSTM` (leitura contínua do disco) e `MTAPMAN` (multitap).
+1. ~~**Módulos que nenhum jogo testado usou.**~~ ✅ Os 12 módulos do disco carregaram sem biblioteca faltando (15/out).
+1. 🔴 **Overlays de código `MWo3` da Konami** (`OVER.AFS`), carregadas em endereços fixos durante o jogo. O recompilador só conhece o formato SNR2. É o que trava hoje (ver `ESTADO.md`).
 2. O recompilador só levou dois jogos até o fim.
 3. A taxa de quadros de um jogo com 22 jogadores animados ao mesmo tempo.
 4. A diferença de último bit nas contas das unidades vetoriais, que o próprio recompilador declara.
