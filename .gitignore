@@ -1,0 +1,24 @@
+# Nada do jogo entra no git. O verificador (scripts/verificar-sem-jogo.py) confere de novo a cada commit.
+*.iso
+*.7z
+*.zip
+*.rar
+*.chd
+*.cso
+*.elf
+*.irx
+
+# Pastas de trabalho: no WSL, ligadas por link a ~/pes-work
+/work/
+/recomp/games
+/recomp/generated
+/recomp/build
+/recomp/tools
+/recomp/third_party/wgpu-native
+
+__pycache__/
+*.ppm
+*.wav
+
+# Vídeo de demonstração do recomp original (9 MB, gameplay de outro jogo)
+/recomp/docs/media/*.mp4

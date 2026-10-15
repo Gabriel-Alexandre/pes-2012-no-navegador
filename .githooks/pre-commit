@@ -1,0 +1,3 @@
+#!/bin/sh
+# Nenhum arquivo do jogo entra no git (scripts/verificar-sem-jogo.py).
+exec python scripts/verificar-sem-jogo.py
