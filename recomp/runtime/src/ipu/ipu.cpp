@@ -1,3 +1,4 @@
+#include "../timing.hpp"
 #include "ipu.hpp"
 
 #include "tables.hpp"
@@ -627,7 +628,10 @@ void write32(std::uint32_t a, std::uint32_t v) {
         g_qsc = (v >> 16) & 0x1Fu;
         g_first = true;
         g_count = v & 0x7FFu;
-        step();
+        {
+            timing::Scope scope(timing::kIpu);
+            step();
+        }
         {
             static const char *trace = std::getenv("PS2_TRACE_IPU");
             static std::uint64_t traced = 0, from = trace ? std::strtoull(trace, nullptr, 10) : 0;

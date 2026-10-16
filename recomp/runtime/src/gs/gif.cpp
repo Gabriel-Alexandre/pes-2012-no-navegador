@@ -1,3 +1,4 @@
+#include "../timing.hpp"
 #include "gif.hpp"
 
 #include "gs.hpp"
@@ -166,6 +167,7 @@ void render(int path, const std::uint8_t *data, std::uint32_t qwc) {
 }
 
 void transfer(int path, const std::uint8_t *data, std::uint32_t qwc) {
+    timing::Scope scope(timing::kPost);
     if (!gs::queue::active()) {
         render(path, data, qwc);
         return;

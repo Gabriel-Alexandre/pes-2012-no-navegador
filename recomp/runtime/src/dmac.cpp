@@ -1,3 +1,4 @@
+#include "timing.hpp"
 #include "dmac.hpp"
 
 #include "kernel.hpp"
@@ -281,6 +282,7 @@ void run_chain(int ch) {
 }
 
 void start(int ch) {
+    timing::Scope scope(timing::kDma);
     Channel &c = g_ch[ch];
     c.paused = false;
     c.tag_end = c.qwc && chain_ends_after_current(c);

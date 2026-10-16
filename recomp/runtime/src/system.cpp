@@ -1,3 +1,4 @@
+#include "timing.hpp"
 #include "dmac.hpp"
 #include "gs/gif.hpp"
 #include "vif.hpp"
@@ -128,7 +129,11 @@ void vblank() {
     ++g_frames;
     time_frames();
     apply_presses();
-    if (g_options.on_vblank) g_options.on_vblank();
+    if (g_options.on_vblank) {
+        timing::Scope scope(timing::kVblank);
+        g_options.on_vblank();
+    }
+    timing::report(g_frames, 300);
     iop::sio2::flush_cards();
     if (g_options.trace_iop_modules && g_frames % 25 == 0) std::fprintf(stderr, "[frame] %llu prims %llu\n", static_cast<unsigned long long>(g_frames), static_cast<unsigned long long>(gs::primitives_drawn()));
     static const bool trace_frames = std::getenv("PS2_TRACE_FRAMES") != nullptr;
@@ -343,6 +348,7 @@ bool load_elf(const std::string &path, std::uint32_t &entry) {
 }
 
 void sync_iop() {
+    timing::Scope scope(timing::kIop);
     const std::uint64_t t = now();
     if (t > g_iop_synced) {
         iop::run(t - g_iop_synced);

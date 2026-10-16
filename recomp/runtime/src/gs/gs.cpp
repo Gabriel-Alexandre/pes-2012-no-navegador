@@ -188,6 +188,19 @@ void forget(const DownloadKey &key) {
 std::vector<std::pair<std::uint32_t, std::uint32_t>> g_seen_ranges;
 std::uint32_t g_transfer_serial = 0, g_stale_first = 0, g_stale_bytes = 0;
 bool g_transfer_stale = false;
+// Reads from the GPU's local memory are expensive in the browser (each one waits for the GPU). A game
+// can read a whole frame back in many strips with nothing drawn in between (PES 2012 reads 224 at a
+// camera cut): from the second read of such a burst the whole memory comes back once and the rest of
+// the burst is served from that copy. g_vram_writes counts every GPU write to local memory.
+std::uint64_t g_vram_writes = 0, g_read_at = ~0ull;
+std::uint32_t g_read_lo = 0, g_read_hi = 0;
+bool g_read_whole = false;
+
+void read_whole() {
+    gpu::download(g_memory);
+    g_read_at = g_vram_writes;
+    g_read_whole = true;
+}
 
 void download_source(const State &s) {
     const std::uint32_t sbp = static_cast<std::uint32_t>(s.bitbltbuf) & 0x3FFFu, sbw = static_cast<std::uint32_t>(s.bitbltbuf >> 16) & 0x3Fu;
@@ -201,7 +214,12 @@ void download_source(const State &s) {
     ++g_transfer_serial;
     g_transfer_stale = false;
     if (!w || !h || x + w > 2048 || y + h > 2048 || end > kMemorySize) {
-        gpu::download(g_memory);
+        read_whole();
+        return;
+    }
+    if (g_read_at == g_vram_writes) {
+        if (g_read_whole || (first >= g_read_lo && end <= g_read_hi)) return;
+        read_whole();
         return;
     }
     const std::pair<std::uint32_t, std::uint32_t> range{first, end - first};
@@ -210,9 +228,14 @@ void download_source(const State &s) {
         g_transfer_stale = true;
         g_stale_first = first;
         g_stale_bytes = end - first;
+        g_read_at = ~0ull;
         return;
     }
     gpu::download(g_memory, first, end - first);
+    g_read_at = g_vram_writes;
+    g_read_whole = false;
+    g_read_lo = first;
+    g_read_hi = end;
     g_seen_ranges.push_back(range);
     if (g_seen_ranges.size() > 8) g_seen_ranges.erase(g_seen_ranges.begin());
 }
@@ -248,7 +271,10 @@ std::size_t g_carried = 0;
 
 void feed_image(const std::uint8_t *data, std::size_t bytes) {
 #ifdef PS2_GPU
-    if (gpu_on() && (g_state.trxdir & 3u) == 0) gpu::image_data(data, bytes);
+    if (gpu_on() && (g_state.trxdir & 3u) == 0) {
+        gpu::image_data(data, bytes);
+        ++g_vram_writes;
+    }
 #endif
     if (!cpu_raster()) return;
     if (!g_transfer.active || (g_state.trxdir & 3u) != 0) return;
@@ -477,7 +503,10 @@ void kick(bool draw) {
     if (draw) {
         if (cpu_raster()) raster::draw(s, s.queue, needed);
 #ifdef PS2_GPU
-        if (gpu_on()) gpu::draw(s, s.queue, needed);
+        if (gpu_on()) {
+            gpu::draw(s, s.queue, needed);
+            ++g_vram_writes;
+        }
 #endif
         ++g_primitives;
     }
@@ -600,7 +629,7 @@ void write(std::uint32_t reg, std::uint64_t value) {
 #ifdef PS2_GPU
         if (gpu_on()) {
             if ((value & 3u) == 0) gpu::image_begin(s);
-            else if ((value & 3u) == 2) gpu::local_copy(s);
+            else if ((value & 3u) == 2) gpu::local_copy(s), ++g_vram_writes;
             else if ((value & 3u) == 1 && !cpu_raster()) download_source(s);
         }
 #endif
@@ -1113,6 +1142,7 @@ void render_state(ps2::state::Stream &s) {
             scale = 1;
         }
         gpu::write_state(vram, scale, clut);
+        ++g_vram_writes;
     }
 #endif
 }

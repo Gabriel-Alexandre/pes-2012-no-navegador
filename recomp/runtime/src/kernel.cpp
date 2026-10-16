@@ -1,3 +1,4 @@
+#include "timing.hpp"
 #include "kernel.hpp"
 
 #include "hw.hpp"
@@ -456,7 +457,15 @@ void dump() {
         if (!s.waiters.empty()) std::fprintf(stderr, "[sema] %d count %d waiters %zu\n", id, s.count, s.waiters.size());
 }
 
+// What a syscall costs on the console: the exception, the BIOS kernel code (a few hundred
+// instructions) and the return. Charged so that a thread that yields in a loop
+// (PES 2012's movie player keeps one calling RotateThreadReadyQueue while its decoder waits)
+// spins thousands of times a frame, as on the console, instead of more than a hundred thousand.
+constexpr std::int32_t kSyscallCycles = 500;
+
 void handle_syscall(Cpu &c, std::uint32_t pc) {
+    timing::Scope scope(timing::kSyscall);
+    c.budget -= kSyscallCycles;
     std::uint32_t n = c.r[3].w[0];
     const bool interrupt_variant = (n & 0x80000000u) != 0;
     if (interrupt_variant) n = 0u - n;

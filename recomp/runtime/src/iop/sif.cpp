@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <deque>
 #include <stdexcept>
@@ -33,8 +34,15 @@ constexpr std::uint32_t kCmdSetSreg = 0x80000001u;
 // thousands of IOP cycles, and EE threads of lower priority run while a caller waits for its reply.
 // PES 2012's movie player polls the sound library by RPC in a loop and decodes in a lower priority
 // thread: with the instant reply the decoder got 2% of the EE and the player dropped most pictures.
-// A packet for the EE is not delivered sooner than this after the EE command that caused it.
-constexpr std::uint64_t kRoundTrip = kEeClock / 1'000'000 * 40;
+// A packet for the EE is not delivered sooner than this after the EE command that caused it
+// (PS2_SIF_LATENCY_US overrides the default, in microseconds).
+std::uint64_t round_trip() {
+    static const std::uint64_t cycles = [] {
+        const char *us = std::getenv("PS2_SIF_LATENCY_US");
+        return kEeClock / 1'000'000 * (us ? std::strtoull(us, nullptr, 10) : 40ull);
+    }();
+    return cycles;
+}
 
 struct Header {
     std::uint32_t size_word, dest, cid, opt;
@@ -196,7 +204,7 @@ void other_data(const std::uint8_t *packet) {
 }
 
 void command(std::uint32_t src, std::uint32_t size) {
-    g_reply_not_before = std::max(g_reply_not_before, now() + kRoundTrip);
+    g_reply_not_before = std::max(g_reply_not_before, now() + round_trip());
     const std::uint8_t *packet = g_ram + (src & (kRamSize - 1));
     const auto *h = reinterpret_cast<const Header *>(packet);
     if (g_options.trace_iop_modules) {
