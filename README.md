@@ -35,7 +35,7 @@ powershell -ExecutionPolicy Bypass -File C:\Users\Gabriel\Downloads\repositorios
 
 Depois, abrir `http://localhost:8620` no **Chrome do Windows**, com a aba **visível**, e clicar em **Start**. Medido em 15/out: **50 quadros por segundo** (a velocidade do PS2 em PAL) na partida, com folga de mais da metade do processador.
 
-Opções de diagnóstico no endereço: `?nowait` (não espera cada quadro ser exibido; serve para medir com a aba escondida), `?state=pontape.state` (começa no pontapé inicial, se o arquivo estiver na pasta servida) e `?press=QUADRO:BOTAO,...` (toques programados).
+Opções de diagnóstico no endereço: `?nowait` (não espera cada quadro ser exibido; serve para medir com a aba escondida), `?state=partida60.state` (partida rolando, 60 Hz), `?state=antes-tunel.state` (antes da entrada dos jogadores) ou `?state=pontape.state` (pontapé, 50 Hz), se o arquivo estiver na pasta servida; `?press=QUADRO:BOTAO,...` (toques programados); e qualquer `?PS2_...=valor` vira variável do executor (por exemplo `?PS2_TIMING=1`, que escreve no console onde vai o tempo).
 
 | Tecla | PS2 |
 |---|---|

@@ -19,6 +19,10 @@ New-Item -ItemType Directory -Force $web | Out-Null
 Write-Host '== copiando a versão de navegador'
 robocopy "$wsl\build\web-pes2012" $web ps2web.* boot.txt /NFL /NDL /NJH /NJS /NP | Out-Null
 
+# estados salvos de teste (?state=nome.state): pontapé, antes do túnel e partida em 60 Hz
+$estados = '\\wsl.localhost\Ubuntu-22.04\home\gabriel\pes-work\estados'
+if (Test-Path $estados) { robocopy $estados $web *.state /NFL /NDL /NJH /NJS /NP | Out-Null }
+
 $iso = Join-Path $dest 'disc.iso'
 if (-not (Test-Path $iso)) {
     Write-Host '== copiando a imagem do disco (2,6 GB, só na primeira vez)'
