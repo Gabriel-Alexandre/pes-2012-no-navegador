@@ -93,6 +93,10 @@ wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && bash 
    - A página repassa qualquer parâmetro `PS2_...` da URL como variável do executor (ex.: `?PS2_NO_VU_THREAD=1`, `?PS2_TIMING=1`, `?PS2_SIF_LATENCY_US=100`).
    - Estados salvos servidos pelo Windows (`?state=`): `pontape.state` (PAL, pontapé), `antes-tunel.state` (quadro 6.600, 60 Hz, antes do túnel) e `partida60.state` (quadro 14.400, 60 Hz, partida rolando).
    - ⚠️ O perfilador embutido (`PS2_PROFILE`) amostra a cada **10 ms** no WSL, não a cada 1 ms: multiplique as amostras por 10 ms.
+6. ⏸️ **Terceiro teste dele no Chrome (16/out), pausado a pedido dele.** Palavras dele: *"pegou quase tudo, todas as cenas carregaram direitinho"*. Ficou para a próxima rodada:
+   - (a) 🔴 **Rostos de jogadores e juízes sem textura** (máscara bege em forma de bico, com os olhos por cima). Aparece nas cenas (túnel, perfilados), na comemoração de gol e *"em poucos momentos dos jogos também"*; *"tem alguns rostos de jogadores que funcionam bem"*. É o mesmo defeito já visto no desenho por software do nativo (Marco 4), então **não é do WebGPU**: começar por ele no nativo.
+   - (b) **Uma "travadinha bem leve" nas transições entre as cenas.** Ele não sabe se é do PS2: *"seria bom verificar"*. Pista: no nativo a entrada tem paradas de 4 a 9 vblanks em algumas trocas de câmera (medido em 16/out, cadência quadro a quadro); conferir se o console faz o mesmo.
+   - Servidor parado e navegador embutido fechado. Para voltar: `scripts/servir-no-windows.ps1`.
 5. ⬜ A próxima versão web já leva a opção `?nowait` no `shell.html` (hoje aplicada à mão na cópia servida).
 4. Ele pode testar já na janela nativa (comando no README; por software dentro do WSL, então lenta).
 
