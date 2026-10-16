@@ -223,6 +223,7 @@ constexpr std::uint32_t kStateVersion = 2;
 std::function<void()> event_action(int id, std::uint64_t at) {
     if (id == hw::kEventVblank) return vblank;
     if (id == hw::kEventVblankEnd + 100) return [] { iop::vblank(false); };
+    if (id == hw::kEventIop) return [] { sif::pump(); };
     if (id >= hw::kEventCount) return kernel::alarm_action(id - hw::kEventCount);
     return hw::event_action(id, at);
 }

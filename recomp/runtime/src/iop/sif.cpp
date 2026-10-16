@@ -28,6 +28,14 @@ constexpr std::uint32_t kCmdBuffer = 0x0001E000u;
 constexpr std::uint32_t kCmdRend = 0x80000008u;
 constexpr std::uint32_t kCmdSetSreg = 0x80000001u;
 
+// The IOP side runs its kernel work (SIF DMA, the command interrupt, waking the RPC server thread,
+// the reply DMA) at no cost, so a call came back in ~150 EE cycles. On the console that path takes
+// thousands of IOP cycles, and EE threads of lower priority run while a caller waits for its reply.
+// PES 2012's movie player polls the sound library by RPC in a loop and decodes in a lower priority
+// thread: with the instant reply the decoder got 2% of the EE and the player dropped most pictures.
+// A packet for the EE is not delivered sooner than this after the EE command that caused it.
+constexpr std::uint64_t kRoundTrip = kEeClock / 1'000'000 * 40;
+
 struct Header {
     std::uint32_t size_word, dest, cid, opt;
     std::uint32_t packet_size() const { return size_word & 0xFFu; }
@@ -81,6 +89,7 @@ std::uint32_t g_iop_rpc_id = 1;
 std::uint32_t g_loop_stub = 0, g_finish_stub = 0;
 std::uint32_t g_iop_dma_id = 1, g_ee_dma_id = 1;
 std::uint64_t g_ee_dma_done = 0;
+std::uint64_t g_reply_not_before = 0;
 
 template <typename T>
 T ee_read(std::uint32_t a) {
@@ -187,6 +196,7 @@ void other_data(const std::uint8_t *packet) {
 }
 
 void command(std::uint32_t src, std::uint32_t size) {
+    g_reply_not_before = std::max(g_reply_not_before, now() + kRoundTrip);
     const std::uint8_t *packet = g_ram + (src & (kRamSize - 1));
     const auto *h = reinterpret_cast<const Header *>(packet);
     if (g_options.trace_iop_modules) {
@@ -745,6 +755,10 @@ void pump() {
     }
     if (g_options.trace_iop_hle && !g_outgoing.empty() && !g_processed) std::fprintf(stderr, "[sif] %zu packets wait for the EE\n", g_outgoing.size());
     if (!g_processed || g_outgoing.empty() || !g_ee_recv) return;
+    if (t < g_reply_not_before) {
+        if (scheduled_at(hw::kEventIop) != g_reply_not_before) schedule(hw::kEventIop, g_reply_not_before, [] { pump(); });
+        return;
+    }
     if (g_options.trace_iop_modules) {
         std::uint32_t cid;
         std::memcpy(&cid, g_outgoing.front().data() + 8, 4);

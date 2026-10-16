@@ -135,7 +135,7 @@ void switch_to(Cpu &c, Thread *next) {
         next->status = kRun;
         g_current = next->id;
         load_context(c, next->context);
-        if (g_options.trace_threads) std::fprintf(stderr, "[thread] -> %d at 0x%08X\n", next->id, next->context.pc);
+        if (g_options.trace_threads) std::fprintf(stderr, "[thread] -> %d at 0x%08X cycle %llu\n", next->id, next->context.pc, static_cast<unsigned long long>(now()));
     } else {
         g_current = 0;
         c.pc = kIdle;
@@ -469,8 +469,8 @@ void handle_syscall(Cpu &c, std::uint32_t pc) {
         }
     }
     if (g_options.trace_syscalls)
-        std::fprintf(stderr, "[sys] %s(0x%02X) %08X %08X %08X %08X from 0x%08X thread %d\n",
-                     syscall_name(n), n, arg(c, 0), arg(c, 1), arg(c, 2), arg(c, 3), pc, g_current);
+        std::fprintf(stderr, "[sys] %s(0x%02X) %08X %08X %08X %08X from 0x%08X thread %d cycle %llu\n",
+                     syscall_name(n), n, arg(c, 0), arg(c, 1), arg(c, 2), arg(c, 3), pc, g_current, static_cast<unsigned long long>(now()));
     switch (n) {
     case 0x02: hw::gs_set_crt(arg(c, 0), arg(c, 1), arg(c, 2)); ret(c, 0); break;
     case 0x04: halt("Exit"); break;
