@@ -38,7 +38,9 @@ struct Unit {
 
 Vu0Regs g_vu1;
 std::uint32_t g_generation[2] = {1, 1};
-std::uint32_t g_top = 0, g_itop = 0;
+// TOP and ITOP of VU1; VU0 keeps its own ITOP, because with VU1 on its own thread a VU0 microprogram
+// started from the EE would otherwise overwrite the TOP of a VU1 program that is running at that moment
+std::uint32_t g_top = 0, g_itop = 0, g_vu0_itop = 0;
 
 struct QDelay {
     std::uint32_t generation = 0, value = 0;
@@ -565,8 +567,8 @@ void lower(Unit &u, std::uint32_t w, std::uint32_t pc, std::uint32_t &npc, bool 
         case 0x42: r.r = r.vf[fs].w[fsf] & 0x7FFFFFu; break;
         case 0x43: r.r = (r.r ^ r.vf[fs].w[fsf]) & 0x7FFFFFu; break;
         case 0x64: if (ft) for (int i = 0; i < 4; ++i) if (dest & (8u >> i)) r.vf[ft].w[i] = r.p; break;
-        case 0x68: store_vi(r, it, g_top); break;
-        case 0x69: store_vi(r, it, g_itop); break;
+        case 0x68: store_vi(r, it, u.code == g_vu1_code ? g_top : 0u); break;
+        case 0x69: store_vi(r, it, u.code == g_vu1_code ? g_itop : g_vu0_itop); break;
         case 0x6C: xgkick(u, r.vi[is]); break;
         case 0x70: case 0x71: case 0x72: case 0x73: {
             const float x = u2f(r.vf[fs].w[0]), y = u2f(r.vf[fs].w[1]), z = u2f(r.vf[fs].w[2]);
@@ -679,6 +681,8 @@ void set_tops(std::uint32_t top, std::uint32_t itop) {
     g_top = top;
     g_itop = itop;
 }
+
+void set_vu0_itop(std::uint32_t itop) { g_vu0_itop = itop; }
 
 void run_fast(int n, std::uint32_t address);
 

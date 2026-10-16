@@ -65,7 +65,7 @@ void run_vu(int unit, std::uint32_t address) {
         vu::set_tops(u.top, u.itop);
     } else {
         u.itop = u.itops;
-        vu::set_tops(0, u.itop);
+        vu::set_vu0_itop(u.itop);
     }
     vu::run(unit, address);
 }
