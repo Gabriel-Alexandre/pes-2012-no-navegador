@@ -23,6 +23,6 @@ JOGO="$DESTINO/games/pes2012"
 mkdir -p "$JOGO"
 cp "$(dirname "$ORIGEM")/config/pes2012-patches.txt" "$JOGO/patches.txt"
 touch "$JOGO/entries.txt"
-grep -v '^#' "$(dirname "$ORIGEM")/config/pes2012-entries.txt" | grep -v '^$' | cat - "$JOGO/entries.txt" | awk '!visto[$0]++' > "$JOGO/entries.novo"
+tr -d '' < "$(dirname "$ORIGEM")/config/pes2012-entries.txt" | grep -v '^#' | grep -v '^$' | cat - "$JOGO/entries.txt" | awk '!visto[$0]++' > "$JOGO/entries.novo"
 mv "$JOGO/entries.novo" "$JOGO/entries.txt"
 echo "== espelhado em $DESTINO"

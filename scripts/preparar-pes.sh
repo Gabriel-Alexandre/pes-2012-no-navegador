@@ -41,7 +41,7 @@ mkdir -p "$JOGO"
 cp "$REPO/config/pes2012-patches.txt" "$JOGO/patches.txt"
 # os pontos de entrada já descobertos, sem os comentários, somados aos que a máquina já tiver
 touch "$JOGO/entries.txt"
-grep -v '^#' "$REPO/config/pes2012-entries.txt" | grep -v '^$' | cat - "$JOGO/entries.txt" | awk '!visto[$0]++' > "$JOGO/entries.novo"
+tr -d '' < "$REPO/config/pes2012-entries.txt" | grep -v '^#' | grep -v '^$' | cat - "$JOGO/entries.txt" | awk '!visto[$0]++' > "$JOGO/entries.novo"
 mv "$JOGO/entries.novo" "$JOGO/entries.txt"
 
 echo "== recompilando (recomp/scripts/port.sh)"
