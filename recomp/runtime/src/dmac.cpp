@@ -10,6 +10,7 @@
 #include "ps2/memory.hpp"
 #include "ps2/system.hpp"
 #include "vif.hpp"
+#include "vu_micro.hpp"
 
 #include "ps2/state.hpp"
 
@@ -47,13 +48,30 @@ bool tag_data_in_ring(std::uint32_t chcr) {
     return id == 1 || id == 7;
 }
 
+// The DMAC also reaches the VU memories at 0x11000000-0x1100FFFF. PES 2012 builds the facial
+// expressions on VU0 and pulls the result with toSPR from 0x11004000 (VU0 data) thousands of times a
+// frame; read as main RAM (0x01004000) it was other data, and the animated face vertices came out as
+// zeros, all collapsed on the head's origin (the "beak" faces).
+std::uint8_t *vu_area(std::uint32_t address) {
+    const std::uint32_t p = address & 0x7FFFFFF0u;
+    if (p < 0x11000000u || p >= 0x11010000u) return nullptr;
+    switch ((p >> 12) & 0xFu) {
+    case 0x0: case 0x1: case 0x2: case 0x3: return g_vu0_code + (p & 0xFF0u);
+    case 0x4: case 0x5: case 0x6: case 0x7: return g_vu0_mem + (p & 0xFF0u);
+    case 0x8: case 0x9: case 0xA: case 0xB: wait_for_vu1(); return g_vu1_code + (p & 0x3FF0u);
+    default: wait_for_vu1(); return g_vu1_mem + (p & 0x3FF0u);
+    }
+}
+
 const std::uint8_t *source(std::uint32_t address) {
     if (address & 0x80000000u) return g_spr + (address & (kScratchpadSize - 1));
+    if (std::uint8_t *vu = vu_area(address)) return vu;
     return g_ram + (address & (kRamSize - 16));
 }
 
 std::uint8_t *target(std::uint32_t address) {
     if (address & 0x80000000u) return g_spr + (address & (kScratchpadSize - 1));
+    if (std::uint8_t *vu = vu_area(address)) return vu;
     return g_ram + (address & (kRamSize - 16));
 }
 
@@ -63,7 +81,7 @@ void deliver(int ch, std::uint32_t address, std::uint32_t qwc) {
     const std::size_t bytes = static_cast<std::size_t>(qwc) * 16;
     const std::size_t room = (address & 0x80000000u) ? kScratchpadSize - (address & (kScratchpadSize - 1)) : kRamSize - (address & (kRamSize - 16));
     const std::uint8_t *data = source(address);
-    if (bytes > room || ch == 9) {
+    if (bytes > room || ch == 9 || vu_area(address)) {
         buffer.resize(bytes);
         for (std::uint32_t i = 0; i < qwc; ++i) std::memcpy(buffer.data() + i * 16, source(address + i * 16), 16);
         data = buffer.data();
@@ -119,6 +137,9 @@ void spr_to_ram(Channel &c, std::uint32_t qwc) {
     for (std::uint32_t i = 0; i < qwc; ++i) {
         const std::uint32_t at = wrap ? ring(c.madr + i * 16) : c.madr + i * 16;
         std::memcpy(target(at), g_spr + ((c.sadr + i * 16) & (kScratchpadSize - 1)), 16);
+        // fromSPR into VU micro memory replaces code: drop what was translated from it
+        const std::uint32_t p = at & 0x7FFFFFF0u;
+        if (!(at & 0x80000000u) && p >= 0x11000000u && p < 0x11010000u && (p & 0x4000u) == 0) vu::code_changed((p >> 15) & 1u);
     }
     c.sadr = (c.sadr + qwc * 16) & (kScratchpadSize - 1);
 }
@@ -288,6 +309,7 @@ void start(int ch) {
     c.tag_end = c.qwc && chain_ends_after_current(c);
     ++g_starts[ch];
     static const bool trace = std::getenv("PS2_TRACE_DMA") != nullptr;
+    if (trace && (ch == 8 || ch == 9)) std::fprintf(stderr, "[dma] ch%d sadr 0x%04X sqwc 0x%08X\n", ch, c.sadr, g_sqwc);
     if (trace) std::fprintf(stderr, "[dma] ch%d chcr 0x%08X madr 0x%08X qwc %u tadr 0x%08X thread %d%s\n", ch, c.chcr, c.madr, c.qwc, c.tadr,
                             kernel::current_thread(), kernel::in_handler() ? " (handler)" : "");
     if (ch == 5 || ch == 6 || ch == 7) {

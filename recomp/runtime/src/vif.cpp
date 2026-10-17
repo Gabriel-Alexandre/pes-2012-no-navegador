@@ -10,6 +10,7 @@
 #include "ps2/state.hpp"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <vector>
 
@@ -223,6 +224,10 @@ void execute(int unit, std::uint32_t cmd, const std::uint32_t *data) {
     const std::uint32_t op = (cmd >> 24) & 0x7Fu, imm = cmd & 0xFFFFu, num = (cmd >> 16) & 0xFFu;
     u.code = cmd;
     if (!on_vu_thread()) ++g_commands[unit][op];
+    // diagnostic: every VIF1 command with its state (PS2_TRACE_VIF1=1)
+    static const bool trace = std::getenv("PS2_TRACE_VIF1") != nullptr;
+    if (trace && unit == 1 && !shadow(unit))
+        std::fprintf(stderr, "[vif1] cmd %08X mode %u cycle %04X mask %08X tops %03X row %08X %08X %08X %08X\n", cmd, u.mode, u.cycle, u.mask, u.tops, u.row[0], u.row[1], u.row[2], u.row[3]);
     switch (op) {
     case 0x00: break;
     case 0x01: u.cycle = imm; break;
@@ -258,9 +263,37 @@ void execute(int unit, std::uint32_t cmd, const std::uint32_t *data) {
         else gif::transfer(2, reinterpret_cast<const std::uint8_t *>(data), imm ? imm : 0x10000u);
         break;
     default:
-        if ((op & 0x60u) == 0x60u) unpack(unit, cmd, data);
+        if ((op & 0x60u) == 0x60u) {
+            unpack(unit, cmd, data);
+            // diagnostic: PS2_TRACE_UNPACK=<cmd hex> prints what one UNPACK command left in VU1 memory
+            static const char *watch = std::getenv("PS2_TRACE_UNPACK");
+            static const std::uint32_t watched = watch ? static_cast<std::uint32_t>(std::strtoul(watch, nullptr, 16)) : 0;
+            if (watch && unit == 1 && cmd == watched && !shadow(unit)) {
+                const std::uint32_t at = (cmd & 0x3FFu) + (((cmd >> 15) & 1u) ? u.tops : 0u);
+                std::fprintf(stderr, "[unpack] %08X at %03X cycle %04X mode %u data", cmd, at, u.cycle, u.mode);
+                for (int k = 0; k < 12; ++k) std::fprintf(stderr, " %08X", data[k]);
+                std::fprintf(stderr, "\n");
+                for (std::uint32_t k = 0; k < 16; ++k) {
+                    std::int32_t w[4];
+                    std::memcpy(w, g_vu1_mem + ((at + k * 4) & 1023u) * 16, 16);
+                    std::fprintf(stderr, "[unpack]   %03X: %d %d %d %d\n", (at + k * 4) & 1023u, w[0], w[1], w[2], w[3]);
+                }
+            }
+        }
         else std::fprintf(stderr, "[vif%d] unknown command 0x%08X\n", unit, cmd);
         break;
+    }
+    // diagnostic: PS2_WATCH_VU1=<qword hex> reports which VIF1 command changed that VU1 data qword
+    static const char *watch = std::getenv("PS2_WATCH_VU1");
+    if (watch && unit == 1 && !shadow(unit)) {
+        static const std::uint32_t at = static_cast<std::uint32_t>(std::strtoul(watch, nullptr, 16)) & 1023u;
+        static std::uint8_t last[16] = {};
+        if (std::memcmp(last, g_vu1_mem + at * 16, 16) != 0) {
+            std::memcpy(last, g_vu1_mem + at * 16, 16);
+            std::int32_t w[4];
+            std::memcpy(w, last, 16);
+            std::fprintf(stderr, "[watch] vif cmd %08X mode %u cycle %04X mask %08X tops %03X: %03X = %d %d %d %d\n", cmd, u.mode, u.cycle, u.mask, u.tops, at, w[0], w[1], w[2], w[3]);
+        }
     }
     if ((cmd & 0x80000000u) && !(u.err & 1u)) {
         u.stat |= 0xC00u;

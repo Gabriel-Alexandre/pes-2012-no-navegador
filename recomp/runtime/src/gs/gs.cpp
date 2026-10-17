@@ -4,6 +4,7 @@
 #include "queue.hpp"
 #include "raster.hpp"
 #include "../hw.hpp"
+#include "../timing.hpp"
 #ifdef PS2_GPU
 #include "gpu/gpu.hpp"
 #endif
@@ -561,6 +562,12 @@ void write(std::uint32_t reg, std::uint64_t value) {
         static std::uint64_t n = 0, start = std::strtoull(seq, nullptr, 10);
         if (++n >= start && n < start + 100000) std::fprintf(stderr, "[gs] w %02X %016llX\n", reg, static_cast<unsigned long long>(value));
     }
+    // diagnostic: every register write during one frame (PS2_TRACE_GSFRAME=N)
+    static const char *at_frame = std::getenv("PS2_TRACE_GSFRAME");
+    if (at_frame) {
+        static const std::uint64_t wanted = std::strtoull(at_frame, nullptr, 10);
+        if (ps2::frame_count() == wanted) std::fprintf(stderr, "[gs] w %02X %016llX\n", reg, static_cast<unsigned long long>(value));
+    }
     switch (reg) {
     case 0x00:
         s.prim = value;
@@ -707,6 +714,8 @@ void write_packed(std::uint32_t reg, const Reg128 &q) {
 void write_image(const std::uint8_t *data, std::uint32_t qwords) { feed_image(data, static_cast<std::size_t>(qwords) * 16); }
 
 std::atomic<std::uint32_t> g_downloads{0};
+bool serve_predicted(const DownloadKey &key, std::uint8_t *data);
+DownloadKey g_last_sync{};
 
 void read_image(std::uint8_t *data, std::uint32_t qwords) {
     if (!queue::active()) {
@@ -717,6 +726,10 @@ void read_image(std::uint8_t *data, std::uint32_t qwords) {
     key.qwords = qwords;
     g_shadow.offset += qwords * 16;
     const std::size_t bytes = static_cast<std::size_t>(qwords) * 16;
+    if (serve_predicted(key, data)) {
+        queue::post(queue::kDownloadAsync, qwords, 0, &key, sizeof key);
+        return;
+    }
     {
         std::lock_guard lock(g_cache_mutex);
         const auto it = std::find_if(g_download_cache.begin(), g_download_cache.end(), [&](const CachedDownload &c) { return c.key == key; });
@@ -729,8 +742,24 @@ void read_image(std::uint8_t *data, std::uint32_t qwords) {
     }
     const std::uint32_t seen = g_downloads.load();
     const std::uintptr_t target = reinterpret_cast<std::uintptr_t>(data);
-    queue::post(queue::kDownload, qwords, 0, &target, sizeof target);
+    // a second strip of the same area and size a few rows below the previous one: ask for the rest
+    // of the burst too, at the same step (PES reads every other row, one row per strip)
+    const std::uint32_t y = static_cast<std::uint32_t>(key.pos >> 16) & 0x7FFu, last_y = static_cast<std::uint32_t>(g_last_sync.pos >> 16) & 0x7FFu;
+    const std::uint32_t step = y > last_y && y - last_y <= 16 ? y - last_y : 0;
+    const bool burst = step && key.offset == 0 && g_last_sync.offset == 0 && key.buf == g_last_sync.buf && key.reg == g_last_sync.reg &&
+                       key.qwords == g_last_sync.qwords && (key.pos & ~0x07FF0000ull) == (g_last_sync.pos & ~0x07FF0000ull);
+    g_last_sync = key;
+    queue::post(queue::kDownload, qwords, burst ? step : 0u, &target, sizeof target);
+    timing::Scope scope(timing::kGsWait);
+    static const bool spikes = std::getenv("PS2_RENDER_SPIKE") != nullptr;
+    const auto wait_start = spikes ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
     while (g_downloads.load() == seen) queue::wait(g_downloads, seen);
+    if (spikes) {
+        // diagnostic: every read that made the emulation wait, with its size, its place and the wait
+        const double took = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - wait_start).count();
+        std::fprintf(stderr, "[gs-read] frame %llu %u qwords +%u buf %016llX pos %016llX size %016llX burst %d wait %.2f ms\n", static_cast<unsigned long long>(ps2::frame_count()),
+                     qwords, key.offset, static_cast<unsigned long long>(key.buf), static_cast<unsigned long long>(key.pos), static_cast<unsigned long long>(key.reg), burst ? 1 : 0, took);
+    }
     remember(key, data, bytes);
 }
 
@@ -779,6 +808,84 @@ void render_read_image(std::uint8_t *data, std::uint32_t qwords) {
         if (bits == 4) data[bit / 8] |= static_cast<std::uint8_t>((v & 15u) << (bit & 4));
         else std::memcpy(data + bit / 8, &v, bits / 8);
     }
+}
+
+// Read-ahead for strip bursts. At a camera dissolve PES 2012 copies the screen to main memory in
+// 224 reads of one 512-pixel row, every other row, and every read used to make the emulation wait a
+// full trip through the GS thread (in the browser, the page's main loop): ~3 ms each, a 130 to 230 ms
+// stall. Once the emulation sees a second strip of the same area a few rows below the first, the GS
+// thread answers it and also lays out the strips that follow at the same step, from the same copy of
+// local memory; they are served at once, each still checked against the real read by the
+// asynchronous refresh, which drops the rest if anything was drawn since. Valid only in that frame.
+struct Prediction {
+    std::uint64_t buf = 0, reg = 0, pos = 0;
+    std::uint32_t y0 = 0, step = 0, count = 0, qwords = 0;
+    std::uint64_t frame = ~0ull, vram = 0;
+    std::vector<std::uint8_t> data;
+};
+
+std::uint64_t vram_serial() {
+#ifdef PS2_GPU
+    return g_vram_writes;
+#else
+    return 0;
+#endif
+}
+std::mutex g_prediction_mutex;
+Prediction g_prediction;
+
+void predict_strips(std::uint32_t qwords, std::uint32_t step) {
+    const std::uint64_t buf = g_state.bitbltbuf, pos = g_state.trxpos, reg = g_state.trxreg;
+    const std::uint32_t sbp = static_cast<std::uint32_t>(buf) & 0x3FFFu, sbw = static_cast<std::uint32_t>(buf >> 16) & 0x3Fu;
+    const std::uint32_t spsm = static_cast<std::uint32_t>(buf >> 24) & 0x3Fu, bits = bits_per_pixel(spsm);
+    const std::uint32_t x = static_cast<std::uint32_t>(pos) & 0x7FFu, y = static_cast<std::uint32_t>(pos >> 16) & 0x7FFu;
+    const std::uint32_t w = static_cast<std::uint32_t>(reg) & 0xFFFu, h = static_cast<std::uint32_t>(reg >> 32) & 0xFFFu;
+    if (bits == 24 || !w || !h || h > 64 || !step || static_cast<std::uint64_t>(w) * h * bits != static_cast<std::uint64_t>(qwords) * 128) return;
+    const std::uint32_t count = std::min((2048u - std::min(2048u, y + h)) / step, 512u / step);
+    if (!count) return;
+#ifdef PS2_GPU
+    if (gpu_on() && !cpu_raster() && !(g_read_at == g_vram_writes && g_read_whole)) {
+        // only the pages the strips to come cover, not the whole 4 MB
+        const bool half = bits == 16;
+        const std::uint32_t pw = spsm == PSMT8 || spsm == PSMT4 ? 128 : 64, ph = spsm == PSMT4 ? 128 : spsm == PSMT8 || half ? 64 : 32;
+        const std::uint32_t last = y + count * step + h - 1;
+        const std::uint32_t first = page_address(sbp, sbw, x, y + step, pw, ph), end = page_address(sbp, sbw, x + w - 1, last, pw, ph) + 8192;
+        if (x + w > 2048 || last >= 2048 || end > kMemorySize || end <= first) read_whole();
+        else {
+            gpu::download(g_memory, first, end - first);
+            g_read_at = ~0ull;
+        }
+    }
+#endif
+    const std::size_t strip = static_cast<std::size_t>(qwords) * 16;
+    std::vector<std::uint8_t> data(strip * count, 0);
+    for (std::uint32_t k = 0; k < count; ++k) {
+        std::uint8_t *out = data.data() + k * strip;
+        std::size_t bit = 0;
+        for (std::uint32_t j = 0; j < h; ++j)
+            for (std::uint32_t i = 0; i < w; ++i, bit += bits) {
+                const std::uint32_t v = read_pixel(spsm, sbp, sbw, (x + i) & 0x7FFu, (y + (k + 1) * step + j) & 0x7FFu);
+                if (bits == 4) out[bit / 8] |= static_cast<std::uint8_t>((v & 15u) << (bit & 4));
+                else std::memcpy(out + bit / 8, &v, bits / 8);
+            }
+    }
+    std::lock_guard lock(g_prediction_mutex);
+    g_prediction = Prediction{buf, reg, pos & ~0x07FF0000ull, y + step, step, count, qwords, ps2::frame_count(), vram_serial(), std::move(data)};
+}
+
+bool serve_predicted(const DownloadKey &key, std::uint8_t *data) {
+    if (key.offset) return false;
+    std::lock_guard lock(g_prediction_mutex);
+    const Prediction &p = g_prediction;
+    const std::uint32_t y = static_cast<std::uint32_t>(key.pos >> 16) & 0x7FFu;
+    if (p.frame != ps2::frame_count() || key.buf != p.buf || key.reg != p.reg || key.qwords != p.qwords || (key.pos & ~0x07FF0000ull) != p.pos ||
+        y < p.y0 || (y - p.y0) % p.step)
+        return false;
+    const std::uint32_t index = (y - p.y0) / p.step;
+    if (index >= p.count) return false;
+    const std::size_t strip = static_cast<std::size_t>(p.qwords) * 16;
+    std::memcpy(data, p.data.data() + index * strip, strip);
+    return true;
 }
 
 std::uint64_t read_privileged(std::uint32_t address) {
@@ -995,6 +1102,7 @@ void post_present() {
     const DisplayRegs regs = display_regs();
     queue::post(queue::kPresent, 0, 0, &regs, sizeof regs);
     ++g_posted_presents;
+    timing::Scope scope(timing::kPresentWait);
     for (std::uint32_t done = g_presented.load(); g_posted_presents - done > 2; done = g_presented.load()) queue::wait(g_presented, done);
 }
 
@@ -1006,6 +1114,13 @@ Rendered render_pending(const std::function<void(const DisplayRegs &)> &on_prese
     for (std::uint32_t n = 1; queue::render().peek(h, payload); ++n) {
         if (!(n & 7u) && std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() > budget_ms) return Rendered::busy;
         bool presented = false;
+        // diagnostic: PS2_RENDER_SPIKE=<ms> names every render command slower than <ms>
+        static const double spike_ms = [] {
+            const char *v = std::getenv("PS2_RENDER_SPIKE");
+            return v ? std::atof(v) : 0.0;
+        }();
+        const auto command_start = spike_ms > 0 ? std::chrono::steady_clock::now() : std::chrono::steady_clock::time_point{};
+        const std::uint32_t command_type = h.type, command_arg0 = h.arg0, command_arg1 = h.arg1;
         switch (h.type) {
         case queue::kGif: gif::render(static_cast<int>(h.arg0), payload, h.arg1); break;
         case queue::kGifReset: gif::render_reset(); break;
@@ -1029,6 +1144,7 @@ Rendered render_pending(const std::function<void(const DisplayRegs &)> &on_prese
             std::memcpy(&target, payload, sizeof target);
             exact_download();
             render_read_image(reinterpret_cast<std::uint8_t *>(target), h.arg0);
+            if (h.arg1) predict_strips(h.arg0, h.arg1);
             g_downloads.fetch_add(1);
             queue::notify(g_downloads);
             break;
@@ -1038,11 +1154,32 @@ Rendered render_pending(const std::function<void(const DisplayRegs &)> &on_prese
             std::memcpy(&key, payload, sizeof key);
             std::vector<std::uint8_t> fresh(static_cast<std::size_t>(h.arg0) * 16);
             render_read_image(fresh.data(), h.arg0);
+            {
+                // something was drawn since the read-ahead: the strips still to come are read for real
+                std::lock_guard lock(g_prediction_mutex);
+                if (g_prediction.count && g_prediction.vram != vram_serial()) g_prediction.count = 0;
+            }
+            static const bool check = std::getenv("PS2_RENDER_SPIKE") != nullptr;
+            if (check) {
+                // diagnostic: a strip served from the read-ahead must equal the real read
+                std::vector<std::uint8_t> predicted(fresh.size());
+                static std::uint64_t served = 0, differ = 0;
+                if (serve_predicted(key, predicted.data())) {
+                    ++served;
+                    if (predicted != fresh) ++differ;
+                    if (served % 100 == 0 || predicted != fresh) std::fprintf(stderr, "[read-ahead] %llu strips checked, %llu differ\n", static_cast<unsigned long long>(served), static_cast<unsigned long long>(differ));
+                }
+            }
             if (key.buf == g_state.bitbltbuf && key.pos == g_state.trxpos && key.reg == g_state.trxreg) remember(key, fresh.data(), fresh.size());
             else forget(key);
             break;
         }
         default: break;
+        }
+        if (spike_ms > 0) {
+            const double took = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - command_start).count();
+            if (took > spike_ms)
+                std::fprintf(stderr, "[render] frame %llu command %u (%u, %u) took %.1f ms\n", static_cast<unsigned long long>(frame_count()), command_type, command_arg0, command_arg1, took);
         }
         queue::render().pop(h);
         if (presented) {

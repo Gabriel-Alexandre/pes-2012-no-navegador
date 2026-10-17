@@ -448,9 +448,19 @@ int main(int argc, char **argv) {
         ps2web_wait_shown();
         g_render_idle.store(g_render_idle.load() + emscripten_get_now() - start);
     };
+    // diagnostic: PS2_RENDER_SPIKE=<ms> also reports gaps of the page's main loop longer than <ms>
+    static const double gap_ms = std::getenv("PS2_RENDER_SPIKE") ? std::atof(std::getenv("PS2_RENDER_SPIKE")) : 0.0;
+    double loop_at = emscripten_get_now();
+    const char *last_step = "start";
     for (;;) {
+        if (gap_ms > 0) {
+            const double now = emscripten_get_now();
+            if (now - loop_at > gap_ms) std::fprintf(stderr, "[web] frame %llu main loop gap %.1f ms after %s\n", static_cast<unsigned long long>(ps2::frame_count()), now - loop_at, last_step);
+            loop_at = now;
+        }
         service_disc();
         const ps2::Rendered rendered = ps2::render_pending(surface, copy ? blit : none, wait_shown, 6.0);
+        last_step = rendered == ps2::Rendered::presented ? "present" : rendered == ps2::Rendered::busy ? "busy" : "idle wait";
         if (rendered == ps2::Rendered::presented) ps2web_frame_done();
         if (rendered != ps2::Rendered::idle) {
             ps2::browser_yield();

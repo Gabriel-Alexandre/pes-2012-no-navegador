@@ -11,7 +11,9 @@
 
 #include "ps2/state.hpp"
 
+#include <algorithm>
 #include <atomic>
+#include <vector>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -748,7 +750,12 @@ void register_programs(const Program *programs, std::uint32_t count) {
         if (programs[i].function) g_programs[programs[i].key] = programs[i].function;
 }
 
+std::uint32_t g_running_entry = 0;
+
 void kick(int unit, std::uint32_t address) {
+    // diagnostic: with PS2_TRACE_GSFRAME, mark which VU1 program sent the next GS writes
+    static const char *at_frame = std::getenv("PS2_TRACE_GSFRAME");
+    if (at_frame && unit == 1 && frame_count() == std::strtoull(at_frame, nullptr, 10)) std::fprintf(stderr, "[kick] entry %04X addr %04X\n", g_running_entry, address & 1023u);
     if (g_kick_log && unit == 1) g_kick_log->push_back(address);
     Unit u = unit_of(unit);
     xgkick(u, address);
@@ -838,6 +845,50 @@ void run_entry(int unit, std::uint32_t pc) {
     static const bool count = std::getenv("PS2_VU_COUNT") != nullptr;
     static std::uint64_t compiled = 0, interpreted = 0;
     static std::unordered_map<std::uint32_t, std::uint64_t> misses;
+    // diagnostic: how often each VU1 program starts (PS2_VU_HIST=1, printed at exit)
+    static const bool hist = std::getenv("PS2_VU_HIST") != nullptr;
+    static std::unordered_map<std::uint32_t, std::uint64_t> starts;
+    if (hist && unit == 1) {
+        static const bool registered = [] {
+            std::atexit([] {
+                std::vector<std::pair<std::uint32_t, std::uint64_t>> v(starts.begin(), starts.end());
+                std::sort(v.begin(), v.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
+                std::fprintf(stderr, "[vu1] program starts:");
+                for (const auto &[pc, n] : v) std::fprintf(stderr, " %04X:%llu", pc, static_cast<unsigned long long>(n));
+                std::fprintf(stderr, "\n");
+            });
+            return true;
+        }();
+        (void)registered;
+        ++starts[pc & 16383u];
+    }
+    if (unit == 1) g_running_entry = pc & 16383u;
+    // diagnostic: PS2_WATCH_VU1=<qword hex> prints that VU1 data qword at every VU1 program start
+    static const char *watch = std::getenv("PS2_WATCH_VU1");
+    if (watch && unit == 1) {
+        static const std::uint32_t at = static_cast<std::uint32_t>(std::strtoul(watch, nullptr, 16)) & 1023u;
+        std::int32_t w[4];
+        std::memcpy(w, g_vu1_mem + at * 16, 16);
+        std::fprintf(stderr, "[watch] entry %04X frame %llu: %03X = %d %d %d %d (vi4 %X vi5 %X)\n", pc & 16383u, static_cast<unsigned long long>(frame_count()), at, w[0], w[1], w[2], w[3], g_vu1.vi[4], g_vu1.vi[5]);
+    }
+    // diagnostic: PS2_DUMP_VU1=<entry hex>,<count>,<dir> saves VU1 data memory and registers when that program starts
+    static const char *dump_spec = std::getenv("PS2_DUMP_VU1");
+    if (dump_spec && unit == 1) {
+        static unsigned entry = 0, count = 0, done = 0;
+        static char dir[256] = {};
+        static const bool parsed = std::sscanf(dump_spec, "%x,%u,%255s", &entry, &count, dir) == 3;
+        static const char *only_frame = std::getenv("PS2_DUMP_VU1_FRAME");
+        const bool frame_ok = !only_frame || frame_count() == std::strtoull(only_frame, nullptr, 10);
+        if (parsed && frame_ok && (pc & 16383u) == entry && done < count) {
+            char name[320];
+            std::snprintf(name, sizeof name, "%s/vu1_%04X_%03u.bin", dir, entry, done++);
+            if (std::FILE *f = std::fopen(name, "wb")) {
+                std::fwrite(g_vu1_mem, 1, sizeof g_vu1_mem, f);
+                std::fwrite(&g_vu1, 1, sizeof g_vu1, f);
+                std::fclose(f);
+            }
+        }
+    }
     if (unit == 1 && !interpret_only) {
         if (const ProgramFn fn = lookup(pc)) {
             ++compiled;
@@ -873,6 +924,7 @@ ProgramFn lookup(std::uint32_t address) {
     const std::vector<std::uint32_t> pcs = reachable(g_vu1_code, 16383u, address);
     const std::uint64_t key = program_key(g_vu1_code, pcs, address & 16383u);
     const auto it = g_programs.find(key);
+    if (std::getenv("PS2_VU_HIST")) std::fprintf(stderr, "[vu1] entry %04X key %016llX %s\n", address & 16383u, static_cast<unsigned long long>(key), it == g_programs.end() ? "not translated" : "translated");
     e.function = it == g_programs.end() ? nullptr : it->second;
     e.jit = nullptr;
     const int jit_mode = jit::mode();

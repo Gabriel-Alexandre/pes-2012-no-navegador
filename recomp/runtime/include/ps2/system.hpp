@@ -98,6 +98,8 @@ void init_graphics();
 void start_render_thread();
 void start_vu_thread();
 void run_vu_thread();
+// waits until the VU1 thread has run everything queued for it (no-op without that thread)
+void wait_for_vu1();
 double vu_thread_idle_ms();
 std::uint64_t vu1_interpreted_calls();
 void post_present();

@@ -1,4 +1,5 @@
 #include "timing.hpp"
+#include "watch_ee.hpp"
 #include "dmac.hpp"
 #include "gs/gif.hpp"
 #include "vif.hpp"
@@ -127,6 +128,7 @@ void time_frames() {
 
 void vblank() {
     ++g_frames;
+    watch_ee::on_frame(g_frames);
     time_frames();
     apply_presses();
     if (g_options.on_vblank) {
@@ -137,7 +139,14 @@ void vblank() {
     iop::sio2::flush_cards();
     if (g_options.trace_iop_modules && g_frames % 25 == 0) std::fprintf(stderr, "[frame] %llu prims %llu\n", static_cast<unsigned long long>(g_frames), static_cast<unsigned long long>(gs::primitives_drawn()));
     static const bool trace_frames = std::getenv("PS2_TRACE_FRAMES") != nullptr;
-    if (trace_frames) std::fprintf(stderr, "[frame] %llu cycle %llu\n", static_cast<unsigned long long>(g_frames), static_cast<unsigned long long>(now()));
+    if (trace_frames) {
+        // host time since the previous vblank, to tell the game's own pauses from emulator cost
+        static auto last = std::chrono::steady_clock::now();
+        const auto t = std::chrono::steady_clock::now();
+        const double host_ms = std::chrono::duration<double, std::milli>(t - last).count();
+        last = t;
+        std::fprintf(stderr, "[frame] %llu cycle %llu host %.2f ms\n", static_cast<unsigned long long>(g_frames), static_cast<unsigned long long>(now()), host_ms);
+    }
     if (!g_options.frames_dir.empty() && g_options.frame_every && g_frames % g_options.frame_every == 0) dump_frame();
     hw::vblank_start();
     iop::vblank(true);
@@ -239,6 +248,7 @@ void sync_vu_thread() {
     if (!gs::queue::vu_active()) return;
     const std::uint32_t seen = g_vu_fence.load();
     gs::queue::vu().post(gs::queue::kVuFence, 0, 0, nullptr, 0);
+    timing::Scope scope(timing::kVuWait);
     while (g_vu_fence.load() == seen) gs::queue::wait(g_vu_fence, seen);
 }
 
@@ -278,6 +288,10 @@ void machine_state(state::Stream &s) {
     s.tag("end");
 }
 
+}
+
+void wait_for_vu1() {
+    if (gs::queue::role() != gs::queue::Role::Vu) sync_vu_thread();
 }
 
 bool save_state(const std::string &path) {
@@ -387,6 +401,8 @@ void boot(std::uint32_t entry, const std::vector<std::string> &args) {
 
 int run() {
     Cpu &c = g_cpu;
+    watch_ee::setup(g_ram, g_spr, frame_count);
+    watch_ee::on_frame(g_frames);
     if (!g_resumed) set_budget(c, kMaxSlice);
     while (!g_halted) {
         if (g_state_request) {
