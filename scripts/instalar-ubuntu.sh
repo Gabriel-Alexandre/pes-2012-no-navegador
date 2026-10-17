@@ -2,7 +2,8 @@
 # Instala no Ubuntu (WSL) o que o recompilador precisa e registra cada pacote
 # novo em docs/apt-instalados.txt, para remover depois com scripts/desinstalar-ubuntu.sh.
 # Rodar uma vez, com sudo:
-#   wsl -d Ubuntu-22.04 -- sudo bash /mnt/c/Users/Gabriel/Downloads/repositorios/pes-2012-no-navegador/scripts/instalar-ubuntu.sh
+#   sudo bash scripts/instalar-ubuntu.sh            (dentro do Ubuntu, na pasta do repositório)
+#   wsl -d Ubuntu-22.04 -- sudo bash /mnt/c/<caminho do repositório>/scripts/instalar-ubuntu.sh   (do Windows)
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$REPO/docs/apt-instalados.txt"

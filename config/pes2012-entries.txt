@@ -1,0 +1,31 @@
+# Pontos de entrada de código que a análise estática do recompilador não acha sozinha,
+# descobertos rodando o PES 2012 (SLES-55658) até uma partida inteira. Cada linha é um
+# endereço do programa principal ou "overlay:endereço" dentro de um overlay MWo3.
+# Com eles, a primeira tradução já sai completa e a exploração não precisa achar nada.
+# Copiado para recomp/games/pes2012/entries.txt pelo scripts/preparar-pes.sh.
+2b5a20
+memorycard:691ff0
+1bd420
+2d20a0
+2d20b0
+2d2090
+2d26a0
+2d2030
+title:9486a0
+title:948690
+title:941718
+title:942530
+title:9469b0
+title:9424d8
+title:942370
+select1:6caf00
+game:d28d00
+2efd90
+game:c39a40
+game:c1c990
+game:be6b40
+game:be3330
+game:be1b40
+game:bb6890
+training_free:95ba70
+game:ce1b80

@@ -2,7 +2,7 @@
 # Desfaz scripts/instalar-ubuntu.sh: remove os pacotes registrados, o repositório
 # do LLVM e a pasta de trabalho ~/pes-work (build, código gerado, Emscripten, imagem).
 # Rodar com sudo:
-#   wsl -d Ubuntu-22.04 -- sudo bash /mnt/c/Users/Gabriel/Downloads/repositorios/pes-2012-no-navegador/scripts/desinstalar-ubuntu.sh
+#   wsl -d Ubuntu-22.04 -- sudo bash /mnt/c/<caminho do repositório>/scripts/desinstalar-ubuntu.sh
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 LOG="$REPO/docs/apt-instalados.txt"

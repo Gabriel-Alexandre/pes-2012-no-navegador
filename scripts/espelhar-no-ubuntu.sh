@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Espelha o código de recomp/ (editado no Windows) para ~/pes-work/recomp, no disco
-# do próprio Ubuntu, onde a compilação roda. Rodar antes de cada build:
-#   wsl -d Ubuntu-22.04 -e bash /mnt/c/Users/Gabriel/Downloads/repositorios/pes-2012-no-navegador/scripts/espelhar-no-ubuntu.sh
+# Só para quem EDITA o código no Windows (quem só quer jogar usa scripts/preparar-pes.sh).
+# Espelha o código de recomp/ para ~/pes-work/recomp, no disco do próprio Ubuntu, onde a
+# compilação roda. Rodar antes de cada build:
+#   wsl -d Ubuntu-22.04 -e bash /mnt/c/<caminho do repositório>/scripts/espelhar-no-ubuntu.sh
 #
 # Por que espelhar e não usar links: com build/ como link para outro disco, o CMake grava
 # caminhos relativos a partir do link e o ninja, rodando na pasta real, não os acha
@@ -17,7 +18,11 @@ rsync -a --delete \
   --exclude /build --exclude /generated --exclude /games --exclude /tools \
   --exclude /third_party/wgpu-native --exclude /docs/media \
   "$ORIGEM" "$DESTINO"
-# correções do executável (60 Hz), lidas pelo port.sh e pelo explorar-de-estado.sh
-mkdir -p "$DESTINO/games/pes2012"
-cp "$(dirname "$ORIGEM")/config/pes2012-patches.txt" "$DESTINO/games/pes2012/patches.txt"
+# correções do executável (60 Hz) e pontos de entrada já descobertos, lidos pelo port.sh
+JOGO="$DESTINO/games/pes2012"
+mkdir -p "$JOGO"
+cp "$(dirname "$ORIGEM")/config/pes2012-patches.txt" "$JOGO/patches.txt"
+touch "$JOGO/entries.txt"
+grep -v '^#' "$(dirname "$ORIGEM")/config/pes2012-entries.txt" | grep -v '^$' | cat - "$JOGO/entries.txt" | awk '!visto[$0]++' > "$JOGO/entries.novo"
+mv "$JOGO/entries.novo" "$JOGO/entries.txt"
 echo "== espelhado em $DESTINO"

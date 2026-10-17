@@ -1,41 +1,64 @@
 # PES 2012 no navegador
 
-Projeto pessoal: rodar o **PES 2012 de PlayStation 2** dentro do navegador (Chrome, WebGPU), por **recompilação estática**: o código do processador do PS2 é traduzido para C++ e compilado para WebAssembly, e o resto do console é reimplementado em volta dele.
+O **PES 2012 de PlayStation 2** rodando dentro do Chrome, a 60 quadros por segundo, do menu até a partida inteira, com gol, replay e memory card. Sem emulador instalado: o código do jogo é **traduzido** para C++ e compilado para WebAssembly, e o resto do PS2 (o sistema, as unidades vetoriais, o chip gráfico em WebGPU, o som) é reimplementado em volta dele. É a técnica chamada **recompilação estática**.
 
-> 🔴 **Este repositório não tem nenhum arquivo do jogo, e nunca vai ter.** A imagem do disco, o executável, o C++ e o WebAssembly gerados a partir dela ficam só nesta máquina, fora do git. O gancho `.githooks/pre-commit` roda `scripts/verificar-sem-jogo.py` e trava o commit se algo do jogo tentar entrar.
+O trabalho foi feito por uma IA (Claude, da Anthropic) sob a direção do autor, em cima do [ps2-web-recomp](https://github.com/snuri00/ps2-web-recomp), o recompilador aberto que já tinha levado o Gran Turismo 4 e o God of War II ao navegador. O que este repositório acrescenta é o que o PES precisou para funcionar: as correções no recompilador, os ajustes do jogo e o passo a passo.
 
-## Por onde começar
+> *English, in short:* PES 2012 (PS2, SLES-55658) running in Chrome at 60 fps through static recompilation, built on [ps2-web-recomp](https://github.com/snuri00/ps2-web-recomp). No game data here: bring your own disc image and run `scripts/preparar-pes.sh`. What had to change for PES is in [`docs/RECOMPILADOR.md`](docs/RECOMPILADOR.md).
 
-| Arquivo | O que tem |
+## ⚠️ Antes de tudo: não tem nada do jogo aqui
+
+Este repositório **não tem nenhum arquivo do PES 2012**: nem a imagem do disco, nem o executável, nem o código traduzido. Ele tem só o recompilador, as correções e os scripts. **Para usar, você precisa da sua própria cópia do jogo**, feita a partir de um disco seu.
+
+O C++ e o WebAssembly que o recompilador gera a partir do disco **são uma tradução do jogo e pertencem à Konami**: ficam na sua máquina, e não se publicam nem se hospedam. Um gancho de commit (`scripts/verificar-sem-jogo.py`) trava qualquer arquivo do jogo que tente entrar no git.
+
+PES e Pro Evolution Soccer são marcas da Konami; PlayStation é marca da Sony Interactive Entertainment. Este projeto não tem relação com nenhuma das duas.
+
+## O que funciona
+
+| | |
 |---|---|
-| [`ESTADO.md`](ESTADO.md) | **onde o projeto está agora**, marco a marco, e o próximo passo |
-| [`docs/PLANO.md`](docs/PLANO.md) | o plano, os marcos e os pontos de decisão |
-| [`docs/INSTALADOS.md`](docs/INSTALADOS.md) | **tudo o que foi instalado no computador**, onde e como remover |
-| [`docs/RECOMPILADOR.md`](docs/RECOMPILADOR.md) | de onde veio o recompilador e o que mudamos nele |
+| Menus, vídeos de abertura, seleção de times | ✅ |
+| Entrada dos jogadores pelo túnel e os times perfilados no campo | ✅ com os rostos certos |
+| Partida inteira, do pontapé ao apito final, com gol, replay e comemoração | ✅ |
+| Gravar no memory card (fica guardado no navegador) | ✅ |
+| Velocidade | **60 quadros por segundo** no Chrome com uma placa de vídeo comum (medido numa RTX 3060), com folga |
+| Controle | teclado e controle de PC (tabela abaixo) |
 
-## Como está montado
+Testado com a versão **SLES-55658** (PAL europeia, menus em espanhol, italiano, **português** e grego). O jogo inicia em 60 Hz por uma correção de uma instrução (`config/pes2012-patches.txt`). Outras versões do PES 2012 podem funcionar, mas não foram testadas.
 
-- `recomp/`: o [ps2-web-recomp](https://github.com/snuri00/ps2-web-recomp) (licença MIT, mantida em `recomp/LICENSE`), copiado para dentro deste repositório. As nossas correções para o PES vão aqui e ficam registradas em `docs/RECOMPILADOR.md`.
-- O código fica no Windows (`Downloads/repositorios/pes-2012-no-navegador`). **A compilação roda no Ubuntu (WSL)**, que é onde o recompilador foi testado, numa **cópia espelhada** em `~/pes-work/recomp`: `scripts/espelhar-no-ubuntu.sh` sincroniza antes de cada build. As pastas pesadas (`games/` com a imagem, `generated/`, `build/`, `tools/` com o Emscripten, `third_party/wgpu-native`) só existem no espelho.
-- `scripts/`: instalação, remoção e o verificador de que nada do jogo entra no git.
+## Como usar
 
-## Como testar nesta máquina
+**Do que você precisa:** um computador com **Windows 11 e o Ubuntu 22.04 no WSL** (ou um Linux), uns **10 GB livres**, o **Chrome**, o **Python** no Windows e a **imagem do seu disco** (`.iso`, ou um `.7z` ou `.zip` com ela dentro).
 
-Janela nativa (o Windows 11 abre a janela do Ubuntu sozinho). ⚠️ **Dentro do Ubuntu do WSL não há placa de vídeo para o WebGPU** (`[gpu] no adapter`): a janela desenha por software e fica lenta. Serve para conferir se o jogo anda; para jogar, o caminho é o navegador no Windows, que usa a placa de vídeo:
-
-```bash
-wsl -d Ubuntu-22.04 -e bash --norc --noprofile -c 'cd ~/pes-work/recomp && build/native-pes2012/ps2run games/pes2012/disc/SLES_556.58 --disc games/pes2012/disc.iso --window'
-```
-
-**No navegador (o jeito de jogar).** Servir pelo Windows, não pelo Ubuntu: pelo repasse de rede do WSL cada leitura do disco ficava lenta. O script copia a versão de navegador e a imagem para `C:\Users\Gabriel\pes-work-windows` e sobe o servidor:
+**1. Clone dentro do Ubuntu** (não em `/mnt/c`: compilar lá é muito mais lento):
 
 ```bash
-powershell -ExecutionPolicy Bypass -File C:\Users\Gabriel\Downloads\repositorios\pes-2012-no-navegador\scripts\servir-no-windows.ps1
+git clone https://github.com/Gabriel-Alexandre/pes-2012-no-navegador.git ~/pes-2012-no-navegador
+cd ~/pes-2012-no-navegador
 ```
 
-Depois, abrir `http://localhost:8620` no **Chrome do Windows**, com a aba **visível**, e clicar em **Start**. Medido em 15/out: **50 quadros por segundo** (a velocidade do PS2 em PAL) na partida, com folga de mais da metade do processador.
+**2. Instale o que o recompilador precisa** (uma vez só; pede a senha do Ubuntu e registra cada pacote em `docs/apt-instalados.txt`, para remover depois com `scripts/desinstalar-ubuntu.sh`):
 
-Opções de diagnóstico no endereço: `?nowait` (não espera cada quadro ser exibido; serve para medir com a aba escondida), `?state=partida60.state` (partida rolando, 60 Hz), `?state=antes-tunel.state` (antes da entrada dos jogadores) ou `?state=pontape.state` (pontapé, 50 Hz), se o arquivo estiver na pasta servida; `?press=QUADRO:BOTAO,...` (toques programados); e qualquer `?PS2_...=valor` vira variável do executor (por exemplo `?PS2_TIMING=1`, que escreve no console onde vai o tempo).
+```bash
+sudo bash scripts/instalar-ubuntu.sh
+```
+
+**3. Prepare o jogo a partir do seu disco.** O script confere a imagem, coloca as correções deste repositório no lugar e roda o recompilador (tradução, uma rodada de teste e as versões de navegador e nativa). A primeira vez baixa o Emscripten (~1 GB) e leva uns 20 minutos:
+
+```bash
+bash scripts/preparar-pes.sh "/mnt/c/Users/VOCE/Downloads/PES 2012.iso"
+```
+
+**4. Jogue.** No Windows, num PowerShell, na pasta do repositório (dá para abrir pelo Explorador em `\\wsl.localhost\Ubuntu-22.04\home\VOCE\pes-2012-no-navegador`):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\servir-no-windows.ps1
+```
+
+Depois abra **http://localhost:8620** no Chrome e clique em **Start**. O servidor só escuta no próprio computador. Num Linux com WebGPU, sem o Windows: `python3 recomp/scripts/serve.py recomp/build/web-pes2012 recomp/games/pes2012/disc.iso`.
+
+⚠️ Por que servir pelo Windows: servida de dentro do Ubuntu, cada leitura do disco passa pelo repasse de rede do WSL e o jogo fica esperando. E dentro do Ubuntu do WSL não há placa de vídeo para o WebGPU, então a janela nativa (`recomp/build/native-pes2012/ps2run`) desenha por software e fica lenta: serve para conferir, não para jogar.
 
 | Tecla | PS2 |
 |---|---|
@@ -43,12 +66,30 @@ Opções de diagnóstico no endereço: `?nowait` (não espera cada quadro ser ex
 | Z / X / A / S | ✕ / ◯ / ▢ / △ |
 | Q / W · 1 / 2 | L1 / R1 · L2 / R2 |
 | Enter / Backspace | Start / Select |
-| I J K L (navegador) | analógico esquerdo |
-| F11 (janela) · F (navegador) | tela cheia |
+| I J K L | analógico esquerdo |
+| F | tela cheia |
 
-## Regras do projeto
+O vídeo de abertura do jogo é longo de fábrica (~2,5 min) e se pula com Start ou ✕. Controle de PC funciona pelo navegador, com vibração e pressão dos botões.
 
-1. Nada do jogo no git, em nenhum commit.
-2. O jogo roda só localmente. Não existe versão hospedada.
-3. Toda instalação no computador entra em `docs/INSTALADOS.md` no mesmo passo em que acontece.
-4. Commit e push a cada iteração.
+## Como foi feito
+
+| Arquivo | O que tem |
+|---|---|
+| [`docs/COMO_FOI_FEITO.md`](docs/COMO_FOI_FEITO.md) | **a história**, marco a marco, em linguagem simples: do jogo que parava no primeiro segundo até a partida inteira a 60 quadros por segundo |
+| [`docs/METODO.md`](docs/METODO.md) | **o método**: as técnicas de engenharia já usadas e validadas que guiaram o trabalho, de onde cada uma vem e onde foi usada |
+| [`docs/RECOMPILADOR.md`](docs/RECOMPILADOR.md) | cada mudança no recompilador, com o porquê e a medida |
+| [`ESTADO.md`](ESTADO.md) | o diário técnico do projeto, marco a marco |
+| [`docs/PLANO.md`](docs/PLANO.md) | o plano aprovado no primeiro dia |
+| [`docs/INSTALADOS.md`](docs/INSTALADOS.md) | tudo o que foi instalado na máquina de desenvolvimento, e como remover |
+
+## Como está montado
+
+- `recomp/`: o [ps2-web-recomp](https://github.com/snuri00/ps2-web-recomp) (licença MIT, mantida em `recomp/LICENSE`), copiado do commit `ebf86d3` e com as correções para o PES.
+- `config/`: o que é do PES 2012 e não é código do jogo: a correção de 60 Hz (`pes2012-patches.txt`) e os pontos de entrada de código que a análise estática não acha sozinha (`pes2012-entries.txt`), descobertos rodando o jogo até uma partida inteira.
+- `scripts/`: preparar o jogo, servir no Windows, instalar e remover, e as ferramentas de teste (`rodar-teste.sh`, `explorar-de-estado.sh`).
+
+**Para quem vai mexer no código:** ative o gancho que trava arquivo do jogo (`git config core.hooksPath .githooks`). O jeito de trabalhar deste projeto (editar no Windows e compilar num espelho dentro do Ubuntu) está no `scripts/espelhar-no-ubuntu.sh` e no `ESTADO.md`. As opções de diagnóstico (`?PS2_TIMING=1`, `?PS2_TRACE_FRAMES=1`, `?nowait` e outras) estão no `docs/RECOMPILADOR.md`.
+
+## Licença
+
+O código deste repositório está sob a licença MIT ([`LICENSE`](LICENSE)); o recompilador mantém a dele ([`recomp/LICENSE`](recomp/LICENSE), também MIT). Nenhuma das duas cobre o jogo, que é da Konami.

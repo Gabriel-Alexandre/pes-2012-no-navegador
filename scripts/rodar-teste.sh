@@ -6,7 +6,7 @@
 # Botões: start select cross circle square triangle up down left right l1 r1 l2 r2
 set -euo pipefail
 nome="$1"; quadros="$2"; shift 2
-R="$HOME/pes-work/recomp"
+R="${PES_RECOMP:-$HOME/pes-work/recomp}"   # o espelho; PES_RECOMP aponta outro
 D="$HOME/pes-work/testes/$nome"
 rm -rf "$D"; mkdir -p "$D/telas"
 PS2_GPU_LOW_POWER=1 "$R/build/native-pes2012/ps2run" "$R/games/pes2012/disc/SLES_556.58" \

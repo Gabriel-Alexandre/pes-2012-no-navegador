@@ -8,7 +8,7 @@
 # Saída: ~/pes-work/testes/estado-<nome do estado>/rodada-N/{telas,log.txt}
 set -euo pipefail
 estado="$1"; quadros="$2"; rodadas="$3"; shift 3
-R="$HOME/pes-work/recomp"
+R="${PES_RECOMP:-$HOME/pes-work/recomp}"   # o espelho; PES_RECOMP aponta outro
 G="$R/games/pes2012"
 D="$HOME/pes-work/testes/estado-$(basename "$estado" .state)"
 mkdir -p "$D"
