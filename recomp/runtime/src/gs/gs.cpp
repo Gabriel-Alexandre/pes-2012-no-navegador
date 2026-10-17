@@ -1144,7 +1144,9 @@ Rendered render_pending(const std::function<void(const DisplayRegs &)> &on_prese
             std::memcpy(&target, payload, sizeof target);
             exact_download();
             render_read_image(reinterpret_cast<std::uint8_t *>(target), h.arg0);
-            if (h.arg1) predict_strips(h.arg0, h.arg1);
+            // PS2_NO_READ_AHEAD turns the strip prediction off, only to measure the before and after
+            static const bool no_read_ahead = std::getenv("PS2_NO_READ_AHEAD") != nullptr;
+            if (h.arg1 && !no_read_ahead) predict_strips(h.arg0, h.arg1);
             g_downloads.fetch_add(1);
             queue::notify(g_downloads);
             break;

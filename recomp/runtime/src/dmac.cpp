@@ -53,6 +53,10 @@ bool tag_data_in_ring(std::uint32_t chcr) {
 // frame; read as main RAM (0x01004000) it was other data, and the animated face vertices came out as
 // zeros, all collapsed on the head's origin (the "beak" faces).
 std::uint8_t *vu_area(std::uint32_t address) {
+    // PS2_NO_VU_DMA brings the old behaviour back (VU addresses read as main RAM), only to film the
+    // before and after of the beak faces.
+    static const bool old_behaviour = std::getenv("PS2_NO_VU_DMA") != nullptr;
+    if (old_behaviour) return nullptr;
     const std::uint32_t p = address & 0x7FFFFFF0u;
     if (p < 0x11000000u || p >= 0x11010000u) return nullptr;
     switch ((p >> 12) & 0xFu) {
