@@ -3,7 +3,8 @@
 #
 # 60 Hz na inicialização. Em 0x001203CC o jogo faz "addiu a0, zero, 1", grava o valor nas opções
 # e chama 0x001C99A0 (modo de vídeo: 1 = 50 Hz PAL, 0 = 60 Hz). O próprio jogo tem o caminho de
-# 60 Hz (bootset.ovl chama 0x002C5600 com 0 e 1, e há vídeos _N e _P no disco), mas não há opção no
-# menu para chegar nele. A 50 quadros por segundo num monitor de 120 Hz cada quadro fica 2 ou 3
+# 60 Hz (bootset.ovl chama 0x002C5600 com 0 e 1, e há vídeos _N e _P no disco); o menu de opções
+# não chega nele, e a tela de modo de vídeo do início (NTSC 60Hz / PAL 50Hz, vista em 29/out) não
+# foi conferida sem esta troca. A 50 quadros por segundo num monitor de 120 Hz cada quadro fica 2 ou 3
 # atualizações da tela e o movimento engasga; a 60 fica sempre 2.
 001203CC 24040001 24040000

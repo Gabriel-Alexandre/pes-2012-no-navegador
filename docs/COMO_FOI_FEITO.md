@@ -20,7 +20,7 @@ A história do projeto, em linguagem simples, do pedido até a partida inteira a
 
 **16h00 a 17h30, a partida.** Seleção de times, estádio, túnel, os times perfilados e, às 17h26, **uma partida inteira, do pontapé ao apito final, com gol e gravação no memory card**, sem faltar nenhum pedaço de código.
 
-**18h30, o primeiro teste do autor.** O contador dizia 50 quadros por segundo, e a imagem travava muito. O contador estava certo: o monitor dele é de 120 Hz, e 50 quadros por segundo não dividem 120, então cada imagem fica ora duas, ora três atualizações da tela. O PES tem o modo de 60 Hz dentro do disco, mas nenhuma opção de menu chega nele. **Uma instrução trocada** (`config/pes2012-patches.txt`) e o jogo passou a iniciar em 60 Hz.
+**18h30, o primeiro teste do autor.** O contador dizia 50 quadros por segundo, e a imagem travava muito. O contador estava certo: o monitor dele é de 120 Hz, e 50 quadros por segundo não dividem 120, então cada imagem fica ora duas, ora três atualizações da tela. O PES tem o modo de 60 Hz dentro do disco, mas nenhuma opção de menu chega nele (🔧 29/out: a gravação do boot com a versão atual mostrou a tela de modo de vídeo do próprio jogo, do `bootset.ovl`, com *NTSC (60Hz)* e *PAL (50Hz)*; as gravações antigas a pulavam com os toques programados. O que não chega no 60 é o menu de opções; a tela do início não foi conferida sem a instrução trocada). **Uma instrução trocada** (`config/pes2012-patches.txt`) e o jogo passou a iniciar em 60 Hz.
 
 ## Dia 2 · 16 de outubro
 
